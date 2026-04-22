@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "soldier",
+      "name": "Soldier",
+      "text": "umm you get the vibes.",
+      "imagePath": "assets/profiles/soldier.jpg",
+    },
+    {
+      "id": "cat",
+      "name": "Cat",
+      "text": "elegant, mysterious, and an absolute gentleman.",
+      "imagePath": "assets/profiles/cat.jpg",
+    },
+    {
+      "id": "clown",
+      "name": "Clown",
+      "text": "chaotic energy, the disgusts of the clown.",
+      "imagePath": "assets/profiles/clown.jpg",
+    },
+    {
+      "id": "surrender",
+      "name": "Surrender",
+      "text": "paws up and no resistance, acceptance and pure harmless chaos .",
+      "imagePath": "assets/profiles/surrender.jpg",
+    }
+  ]
+}
