@@ -1,50 +1,46 @@
-// simple card queue manager
-// just tracks which card we're on and emits events
+import { SWIPE_EVENTS } from "../constants/swipeConfig.js";
 
 export class CardStack extends Phaser.Events.EventEmitter {
+  // hold profile list and current position in the stack
   constructor() {
     super();
     this.profiles = [];
     this.currentIndex = 0;
-    console.log("[CardStack] created");
   }
 
-  // load profiles
-  init(profilesData) {
-    console.log(`[CardStack] init with ${profilesData.length} profiles`);
-    this.profiles = profilesData;
+  // load a new deck and emit first card
+  init(profiles) {
+    // reset state whenever we start or restart a deck
+    this.profiles = profiles;
     this.currentIndex = 0;
-    this.emit("onCardReady", this.getCard());
+    this.emitCurrentCard();
   }
 
-  // get current card
-  getCard() {
-    if (this.currentIndex >= this.profiles.length) {
-      console.log("[CardStack] no more cards");
-      return null;
-    }
-    const card = this.profiles[this.currentIndex];
-    console.log(`[CardStack] getCard: ${card.id}`);
-    return card;
+  // return current profile or null if out of cards
+  getCurrentProfile() {
+    return this.profiles[this.currentIndex] || null;
   }
 
-  // next card exists?
-  hasNext() {
-    return this.currentIndex + 1 < this.profiles.length;
+  // check if current index still points at a valid card
+  hasActiveCard() {
+    return this.currentIndex < this.profiles.length;
   }
 
-  // destroy and move to next
-  destroyCard(reason) {
-    const card = this.getCard();
-    console.log(`[CardStack] destroy ${card?.id} (${reason})`);
+  // move stack forward after a card is resolved
+  consumeCurrentCard() {
+    // scene calls this after a slash/hack flow fully finishes
+    if (!this.hasActiveCard()) return;
     this.currentIndex += 1;
+    this.emitCurrentCard();
+  }
 
-    if (this.hasNext()) {
-      console.log(`[CardStack] next card ready`);
-      this.emit("onCardReady", this.getCard());
-    } else {
-      console.log(`[CardStack] stack empty`);
-      this.emit("onStackEmpty");
+  // emit either next card or stack empty event
+  emitCurrentCard() {
+    // single place that decides if we publish next card or empty event
+    if (!this.hasActiveCard()) {
+      this.emit(SWIPE_EVENTS.STACK_EMPTY);
+      return;
     }
+    this.emit(SWIPE_EVENTS.CARD_READY, this.getCurrentProfile());
   }
 }

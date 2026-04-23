@@ -1,46 +1,20 @@
-// simple effects - draw and fade
+import { SWIPE_DIRECTIONS } from "../constants/swipeConfig.js";
+import { SlashEffect } from "./effects/SlashEffect.js";
+import { HackEffect } from "./effects/HackEffect.js";
 
 export class AnimationOverlay {
+  // hold concrete effect implementations and route calls
   constructor(scene) {
     this.scene = scene;
-    console.log("[AnimationOverlay] created");
+    // keep heavy effect code out of the scene by delegating here
+    this.slashEffect = new SlashEffect(scene);
+    this.hackEffect = new HackEffect(scene);
   }
 
-  // one method for both effects
-  playEffect(type, x, y, onDone) {
-    console.log(`[AnimationOverlay] playing ${type} effect`);
-    
-    const graphics = this.scene.add.graphics();
-    graphics.setDepth(50);
-
-    if (type === "slash") {
-      // draw blood circles
-      for (let i = 0; i < 10; i++) {
-        const ox = (Math.random() - 0.5) * 200;
-        const oy = (Math.random() - 0.5) * 200;
-        const size = Math.random() * 15 + 5;
-        graphics.fillStyle(0x8b0000, 1);
-        graphics.fillCircle(x + ox, y + oy, size);
-      }
-    } else if (type === "hack") {
-      // draw green lines
-      graphics.lineStyle(2, 0x00ff00, 0.3);
-      for (let yy = 0; yy < this.scene.cameras.main.height; yy += 10) {
-        graphics.lineBetween(0, yy, this.scene.cameras.main.width, yy);
-      }
-    }
-
-    // fade out
-    this.scene.tweens.add({
-      targets: graphics,
-      alpha: 0,
-      duration: 600,
-      ease: "Cubic.easeOut",
-      onComplete: () => {
-        console.log(`[AnimationOverlay] ${type} effect done`);
-        graphics.destroy();
-        if (onDone) onDone();
-      },
-    });
+  // dispatch effect call based on swipe direction
+  playEffect(direction, x, y, onDone) {
+    // slash uses card position, hack is full-screen and ignores x/y
+    if (direction === SWIPE_DIRECTIONS.SLASH) return this.slashEffect.play(x, y, onDone);
+    return this.hackEffect.play(onDone);
   }
 }
