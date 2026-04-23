@@ -53,6 +53,12 @@ export class InputController extends Phaser.Events.EventEmitter {
   // finish drag and decide slash/hack/none based on x distance
   handlePointerUp(pointer) {
     if (!this.isDragging) return;
+    // if input gets locked during drag, clear state and skip swipe emit
+    if (!this.isEnabled) {
+      this.isDragging = false;
+      this.hasCrossedDeadZone = false;
+      return;
+    }
     this.isDragging = false;
     const dragX = pointer.x - this.dragStartX; // final x distance decides slash/hack/none
     if (this.hasCrossedDeadZone) {
