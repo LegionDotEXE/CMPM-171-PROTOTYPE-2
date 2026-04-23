@@ -1,4 +1,5 @@
-// super simple card - just image + text, position updates
+// super simple card - just image + text, position updates 
+// all the styling for the card is made here, so we can easily swap out the content
 
 export class SwipeCard extends Phaser.GameObjects.Container {
   constructor(scene, x, y, profile) {
@@ -7,10 +8,11 @@ export class SwipeCard extends Phaser.GameObjects.Container {
     this.centerX = x;
     this.centerY = y;
     
-    console.log(`[SwipeCard] created: ${profile.id}`);
+    console.log(`[SwipeCard] created: id=${profile.id} name=${profile.name}`);
 
     // image
-    const img = scene.add.image(0, 0, profile.id);
+    const textureKey = `profile_${profile.id}`;
+    const img = scene.add.image(0, 0, textureKey);
     img.setDisplaySize(320, 480);
     this.add(img);
 
@@ -35,8 +37,9 @@ export class SwipeCard extends Phaser.GameObjects.Container {
   }
 
   static preload(scene, profile) {
-    if (!scene.textures.exists(profile.id)) {
-      scene.load.image(profile.id, profile.imagePath);
+    const textureKey = `profile_${profile.id}`;
+    if (!scene.textures.exists(textureKey)) {
+      scene.load.image(textureKey, profile.imagePath);
     }
   }
 
