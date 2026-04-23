@@ -25,6 +25,7 @@ export class SwipeLogic {
     this.stack = stack;
     this.state = States.IDLE;
     this.threshold = options.threshold ?? SCENE_CONFIG.swipeThreshold;
+    this.effects = options.effects ?? null; // optional SwipeEffects instance for overlays
     this.dragStartPointerX = 0; // captured on pointerdown so move math is consistent
   }
 
@@ -129,19 +130,28 @@ export class SwipeLogic {
     }
 
     if (direction === SWIPE_DIRECTIONS.SLASH) {
-      await card.playSlashAnimation();
+      // slash plays the cut-in-half card animation AND the blood overlay together.
+      // Promise.all keeps both visuals synchronized without extra state tracking.
+      await Promise.all([
+        card.playSlashAnimation(),
+        this.effects ? this.effects.play(direction, card.x, card.y) : Promise.resolve(),
+      ]);
     } else {
       this.stack.onHackCommit?.(card.id);
-      await card.animate(
-        {
-          x: card.centerX + SCENE_CONFIG.throwHackX,
-          y: card.centerY - SCENE_CONFIG.throwRiseY,
-          angle: SCENE_CONFIG.throwHackAngle,
-          alpha: 0,
-        },
-        SCENE_CONFIG.throwTweenMs,
-        "Quad.easeIn"
-      );
+      // hack: throw card off-screen AND play the binary rain overlay together.
+      await Promise.all([
+        card.animate(
+          {
+            x: card.centerX + SCENE_CONFIG.throwHackX,
+            y: card.centerY - SCENE_CONFIG.throwRiseY,
+            angle: SCENE_CONFIG.throwHackAngle,
+            alpha: 0,
+          },
+          SCENE_CONFIG.throwTweenMs,
+          "Quad.easeIn"
+        ),
+        this.effects ? this.effects.play(direction) : Promise.resolve(),
+      ]);
     }
 
     await this.stack.promote();

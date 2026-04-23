@@ -70,6 +70,32 @@ export class ProfileCard extends Phaser.GameObjects.Container {
   }
 
   /**
+   * reflow all child visuals to match a new bounds box.
+   * input: { width, height } matching the scene's new card size.
+   * output: image/panel/text get repositioned and resized in-place.
+   * this is called by the scene on window resize so the deck keeps
+   * the right proportions without destroying and rebuilding cards.
+   */
+  applyLayout(newBounds) {
+    this.bounds = newBounds;
+    const { width, height } = newBounds;
+
+    // top image: same 70% ratio + same y-anchor math as initLayout.
+    this.image.setPosition(0, -height * 0.15);
+    this.image.setDisplaySize(width, height * LAYOUT_CONFIG.imageRatio);
+
+    // bottom panel: rebuild size so the rect matches the new card width/height.
+    this.textPanel.setPosition(0, height * 0.35);
+    this.textPanel.setSize(width, height * LAYOUT_CONFIG.textRatio);
+
+    // name + description: keep their positions inside the panel and
+    // update the description wrap width so long text reflows cleanly.
+    this.nameText.setPosition(0, height * 0.3);
+    this.descText.setPosition(0, height * 0.4);
+    this.descText.setWordWrapWidth(width * 0.88, true);
+  }
+
+  /**
    * unified tween helper that returns a promise.
    * input: tween props, duration, ease. output: resolves when tween finishes.
    * this is the ONLY animation entry point for the scene/logic layer,

@@ -33,11 +33,13 @@ const target = {
 
 // proxy layer: validates any bulk assignment to hackedIds.
 // example safe usage: GameState.hackedIds = [1, 2, 3]
-// invalid usage (unknown prop or non-array value) is rejected silently.
+// invalid input (wrong prop name or non-array value) is ignored without throwing.
+// we always return true so strict-mode callers never see a TypeError; the
+// proxy's job here is defensive input scrubbing, not hard access control.
 export const GameState = new Proxy(target, {
   set(innerTarget, prop, value) {
-    if (prop !== "hackedIds") return false; // block accidental overwrite of other props
-    if (!Array.isArray(value)) return false; // enforce array shape for bulk set
+    if (prop !== "hackedIds") return true; // ignore unknown writes quietly
+    if (!Array.isArray(value)) return true; // ignore non-array bulk writes quietly
     value.forEach((id) => {
       const numericId = Number(id);
       if (Number.isFinite(numericId)) innerTarget.hackedIds.add(numericId);

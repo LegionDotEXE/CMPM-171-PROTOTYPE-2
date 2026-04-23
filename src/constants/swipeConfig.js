@@ -37,6 +37,31 @@ export const CARD_CONFIG = Object.freeze({
   fragmentTweenMs: 280, // slash animation duration
 });
 
+// overlay effect tuning for the slash blood + hack binary rain.
+// kept in one place so tweaking feel (count, speed, duration) is one edit.
+export const EFFECT_CONFIG = Object.freeze({
+  depth: 80, // base depth so overlays sit above cards
+  // slash blood decal + particle burst
+  slashHoldMs: 280, // how long the decal stays at full alpha before fading
+  slashFadeMs: 740, // decal fade duration
+  slashCleanupMs: 1200, // hard destroy time so no memory leaks
+  bloodScale: 1.2, // particle/blob size multiplier
+  bloodCount: 180, // particles per burst
+  bloodSpeedMin: 90, // min particle speed
+  bloodSpeedMax: 360, // max particle speed
+  bloodGravity: 760, // gravity for particles (faster falloff = juicier)
+  bloodSpreadX: 320, // random x spread for splatter blobs
+  bloodSpreadY: 240, // random y spread for splatter blobs
+  // hack binary rain + backdrop tint
+  hackGrowMs: 700, // backdrop tint grow-in time
+  hackHoldMs: 300, // hold at full strength before fading
+  hackFadeMs: 520, // fade out time
+  hackColumnSpacing: 36, // distance between binary rain columns
+  hackBinaryLength: 22, // characters per rain column
+  hackRainMinMs: 1400, // fastest column fall
+  hackRainMaxMs: 2300, // slowest column fall
+});
+
 // phone-frame layout: determines card size and pending card offset.
 export const LAYOUT_CONFIG = Object.freeze({
   imageRatio: 0.7, // top 70% of the card is the profile image

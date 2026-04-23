@@ -1,5 +1,6 @@
 import { ProfileCard } from "../objects/ProfileCard.js";
 import { SwipeLogic } from "../systems/InputManager.js";
+import { SwipeEffects } from "../systems/SwipeEffects.js";
 import { GameState } from "../systems/GameState.js";
 import { CARD_CONFIG, LAYOUT_CONFIG, SCENE_CONFIG } from "../constants/swipeConfig.js";
 
@@ -15,6 +16,7 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.pendingCard = null; // next card (already on screen, behind active)
     this.bounds = null; // current card size + screen center (rebuilt on resize)
     this.logic = null; // SwipeLogic instance created after stack is ready
+    this.effects = null; // SwipeEffects owns slash blood + hack binary rain overlays
     this.resizeHandler = null; // saved so we can cleanly detach on shutdown
   }
 
@@ -65,6 +67,7 @@ export class SwipeDeckScene extends Phaser.Scene {
   // order matters: stack first (so logic has something to get), then inputs.
   startGameplay() {
     this.setupStack();
+    this.effects = new SwipeEffects(this); // prepare slash/hack overlay instance
     this.setupLogic();
     this.setupInput();
   }
@@ -141,7 +144,10 @@ export class SwipeDeckScene extends Phaser.Scene {
         promote: () => this.promote(),
         onHackCommit: (profileId) => this.onHackCommit(profileId),
       },
-      { threshold: SCENE_CONFIG.swipeThreshold }
+      {
+        threshold: SCENE_CONFIG.swipeThreshold,
+        effects: this.effects, // logic plays overlays through this handle
+      }
     );
   }
 
@@ -201,16 +207,20 @@ export class SwipeDeckScene extends Phaser.Scene {
     );
   }
 
-  // recompute bounds on window resize and reapply active/pending poses.
-  // cards remain the same instances; only their size + rest position change.
+  // recompute bounds on window resize and reflow every card.
+  // cards remain the same instances; their inner visuals (image size,
+  // panel size, text wrap width) are rebuilt via ProfileCard.applyLayout so
+  // nothing stretches or misaligns after the window changes size.
   handleResize() {
-    if (!this.activeCard && !this.pendingCard) {
-      this.bounds = this.computeBounds();
-      return;
-    }
     this.bounds = this.computeBounds();
-    this.styleActive(this.activeCard);
-    this.stylePending(this.pendingCard);
+    if (this.activeCard) {
+      this.activeCard.applyLayout(this.bounds);
+      this.styleActive(this.activeCard);
+    }
+    if (this.pendingCard) {
+      this.pendingCard.applyLayout(this.bounds);
+      this.stylePending(this.pendingCard);
+    }
   }
 
   // detach anything we subscribed to on the scale manager.
