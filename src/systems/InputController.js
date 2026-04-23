@@ -10,9 +10,9 @@ export class InputController extends Phaser.Events.EventEmitter {
     this.hasCrossedDeadZone = false;
     this.dragStartX = 0;
     this.dragStartY = 0;
-    this.onPointerDown = (pointer) => this.handlePointerDown(pointer);
-    this.onPointerMove = (pointer) => this.handlePointerMove(pointer);
-    this.onPointerUp = (pointer) => this.handlePointerUp(pointer);
+    this.onPointerDown = (pointer) => this.handlePointerDown(pointer); // saved refs let destroy() unbind exact callbacks
+    this.onPointerMove = (pointer) => this.handlePointerMove(pointer); // same callback identity required by phaser off()
+    this.onPointerUp = (pointer) => this.handlePointerUp(pointer); // keeps input lifecycle leak-free
     this.onKeyDown = (event) => this.handleKeyDown(event);
     // bind once in constructor so destroy can remove exact same handlers
     this.bindInputEvents();
@@ -32,15 +32,15 @@ export class InputController extends Phaser.Events.EventEmitter {
     // remember where swipe started so we can measure horizontal intent
     this.isDragging = true;
     this.hasCrossedDeadZone = false;
-    this.dragStartX = pointer.x;
-    this.dragStartY = pointer.y;
+    this.dragStartX = pointer.x; // drag anchor x used for distance math
+    this.dragStartY = pointer.y; // drag anchor y used for dead-zone check
   }
 
   // emit drag movement only after crossing tiny dead zone
   handlePointerMove(pointer) {
     if (!this.isDragging || !this.isEnabled) return;
-    const dragX = pointer.x - this.dragStartX;
-    const dragY = pointer.y - this.dragStartY;
+    const dragX = pointer.x - this.dragStartX; // positive means dragging to right side
+    const dragY = pointer.y - this.dragStartY; // signed y offset from drag start point
     if (!this.hasCrossedDeadZone && !this.isPastDragDeadZone(dragX, dragY)) return;
     if (!this.hasCrossedDeadZone) {
       this.hasCrossedDeadZone = true;
@@ -54,7 +54,7 @@ export class InputController extends Phaser.Events.EventEmitter {
   handlePointerUp(pointer) {
     if (!this.isDragging) return;
     this.isDragging = false;
-    const dragX = pointer.x - this.dragStartX;
+    const dragX = pointer.x - this.dragStartX; // final x distance decides slash/hack/none
     if (this.hasCrossedDeadZone) {
       this.emit(SWIPE_EVENTS.DRAG_END);
     }
@@ -78,7 +78,7 @@ export class InputController extends Phaser.Events.EventEmitter {
 
   // shared helper to emit swipe end payload
   emitSwipe(direction) {
-    this.emit(SWIPE_EVENTS.END, { direction });
+    this.emit(SWIPE_EVENTS.END, { direction }); // unified payload shape for scene swipe resolver
   }
 
   // desktop parity: a hack, d slash, w/s snapback

@@ -12,16 +12,16 @@ export class SwipeFlowController {
     // "none" means no commit yet, so card should return to center
     if (direction === SWIPE_DIRECTIONS.NONE) return this.snapCardBack(card, onSnapBack);
     // committed swipe: throw card and run matching overlay effect
-    this.throwCard(card, direction);
-    this.animationOverlay.playEffect(direction, card.x, card.y, onComplete);
+    this.throwCard(card, direction); // start movement tween immediately so card exits with momentum
+    this.animationOverlay.playEffect(direction, card.x, card.y, onComplete); // run matching visual layer and callback when done
   }
 
   // animate card out of stack for slash or hack commit
   throwCard(card, direction) {
     // direction controls throw side and rotation sign
     // use center-relative offsets so slash always goes right from current card position
-    const xOffset = direction === SWIPE_DIRECTIONS.SLASH ? SCENE_CONFIG.throwSlashX : SCENE_CONFIG.throwHackX;
-    const rotation = direction === SWIPE_DIRECTIONS.SLASH ? SCENE_CONFIG.throwSlashRotation : SCENE_CONFIG.throwHackRotation;
+    const xOffset = direction === SWIPE_DIRECTIONS.SLASH ? SCENE_CONFIG.throwSlashX : SCENE_CONFIG.throwHackX; // right for slash, left for hack
+    const rotation = direction === SWIPE_DIRECTIONS.SLASH ? SCENE_CONFIG.throwSlashRotation : SCENE_CONFIG.throwHackRotation; // tilt direction matches throw side
     this.scene.tweens.add({
       targets: card,
       x: card.x + xOffset,

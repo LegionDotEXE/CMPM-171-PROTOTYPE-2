@@ -1,10 +1,10 @@
 import { EFFECT_CONFIG } from "../../constants/swipeConfig.js";
 
 const BLOOD_TEXTURE = {
-  key: "blood_drop",
-  size: 22,
-  radius: 11,
-  color: 0xcf1010,
+  key: "blood_drop", // texture cache key used by particle system
+  size: 22, // generated texture pixel size
+  radius: 11, // circle radius inside generated texture
+  color: 0xcf1010, // base blood color for particles
 };
 
 export class SlashEffect {
@@ -37,8 +37,8 @@ export class SlashEffect {
   // draw base splatter decal layer
   createSplatter(centerX, centerY) {
     const splatter = this.scene.add.graphics();
-    splatter.setDepth(EFFECT_CONFIG.depth);
-    splatter.fillStyle(0x8f0000, 0.78);
+    splatter.setDepth(EFFECT_CONFIG.depth); // decal sits under flying particles
+    splatter.fillStyle(0x8f0000, 0.78); // dark red fill for base gore shape
     this.drawBlotches(splatter, centerX, centerY);
     return splatter;
   }
@@ -80,7 +80,7 @@ export class SlashEffect {
       duration: EFFECT_CONFIG.slashFadeMs,
       ease: "Cubic.easeOut",
     });
-    this.scene.time.delayedCall(EFFECT_CONFIG.slashCleanupMs, () => {
+    this.scene.time.delayedCall(EFFECT_CONFIG.slashCleanupMs, () => { // hard cleanup after fade window
       splatter.destroy();
       particles.destroy();
       onDone?.();

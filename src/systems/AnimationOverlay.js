@@ -14,7 +14,7 @@ export class AnimationOverlay {
   // dispatch effect call based on swipe direction
   playEffect(direction, x, y, onDone) {
     // slash uses card position, hack is full-screen and ignores x/y
-    if (direction === SWIPE_DIRECTIONS.SLASH) return this.slashEffect.play(x, y, onDone);
-    return this.hackEffect.play(onDone);
+    if (direction === SWIPE_DIRECTIONS.SLASH) return this.slashEffect.play(x, y, onDone); // local impact effect where card exits
+    return this.hackEffect.play(onDone); // screen-wide binary overlay for hack branch
   }
 }

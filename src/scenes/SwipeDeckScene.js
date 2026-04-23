@@ -1,9 +1,10 @@
-import { SwipeCard } from "../objects/SwipeCard.js";
 import { InputController } from "../systems/InputController.js";
 import { AnimationOverlay } from "../systems/AnimationOverlay.js";
 import { ProfileLoader } from "../systems/ProfileLoader.js";
 import { SwipeFlowController } from "../systems/SwipeFlowController.js";
-import { CARD_CONFIG, LAYOUT_CONFIG, SWIPE_DIRECTIONS, SWIPE_EVENTS } from "../constants/swipeConfig.js";
+import { CardStackManager } from "../systems/CardStackManager.js";
+import { PersistenceManager } from "../systems/PersistenceManager.js";
+import { LAYOUT_CONFIG, SWIPE_DIRECTIONS, SWIPE_EVENTS } from "../constants/swipeConfig.js";
 
 export class SwipeDeckScene extends Phaser.Scene {
   // setup scene-level references used across card lifecycle
@@ -13,11 +14,8 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.animationOverlay = null;
     this.profileLoader = null;
     this.flowController = null;
+    this.stackManager = null;
     this.profiles = [];
-    this.currentIndex = 0;
-    this.activeCard = null;
-    this.pendingCard = null;
-    this.bufferCard = null;
     this.layout = null;
     this.isCardGrabbed = false;
   }
@@ -36,8 +34,9 @@ export class SwipeDeckScene extends Phaser.Scene {
     if (!this.profiles.length) return;
     this.setupSystems();
     this.setupEvents();
-    this.layout = this.computeCardLayout();
-    this.buildInitialStack();
+    this.layout = this.computeCardLayout(); // snapshot layout for current viewport size
+    this.setupStackManager(); // inject scene services into stack lifecycle manager
+    this.initializeStack(); // async create active + pending + buffer cards
     this.profileLoader.loadRemainingProfiles(this.profiles);
   }
 
@@ -46,6 +45,24 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.inputController = new InputController(this);
     this.animationOverlay = new AnimationOverlay(this);
     this.flowController = new SwipeFlowController(this, this.animationOverlay);
+  }
+
+  /**
+   * create stack manager with shared dependencies and layout getter.
+   * inputs are scene services and current profile list.
+   * this keeps slot lifecycle logic outside scene methods.
+   */
+  setupStackManager() {
+    this.stackManager = new CardStackManager(this, this.profileLoader, this.profiles, () => this.layout);
+  }
+
+  /**
+   * initialize active/pending/buffer slots asynchronously.
+   * input is none and output is prepared look-ahead stack.
+   * this guarantees first frame has ready card textures.
+   */
+  async initializeStack() {
+    await this.stackManager.initialize();
   }
 
   // subscribe to stack and input events
@@ -61,18 +78,18 @@ export class SwipeDeckScene extends Phaser.Scene {
 
   // frame loop: apply smooth drag motion while card is grabbed
   update() {
-    if (!this.activeCard || !this.isCardGrabbed) return;
-    this.activeCard.stepTowardsTarget();
+    if (!this.isCardGrabbed) return;
+    this.stackManager.stepActiveCard();
   }
 
   // compute card bounds from camera size and manual phone insets
   computeCardLayout() {
     const camera = this.cameras.main;
-    const insets = LAYOUT_CONFIG.frameInsets;
-    const innerWidth = (camera.width - insets.left - insets.right) * LAYOUT_CONFIG.frameFitScale;
-    const innerHeight = (camera.height - insets.top - insets.bottom) * LAYOUT_CONFIG.frameFitScale;
-    const cardHeight = innerHeight;
-    const cardWidth = Math.min(innerWidth, cardHeight * LAYOUT_CONFIG.cardMaxAspect);
+    const insets = LAYOUT_CONFIG.frameInsets; // manual phone-frame content padding
+    const innerWidth = (camera.width - insets.left - insets.right) * LAYOUT_CONFIG.frameFitScale; // usable width inside frame
+    const innerHeight = (camera.height - insets.top - insets.bottom) * LAYOUT_CONFIG.frameFitScale; // usable height inside frame
+    const cardHeight = innerHeight; // card touches top and bottom of usable frame area
+    const cardWidth = Math.min(innerWidth, cardHeight * LAYOUT_CONFIG.cardMaxAspect); // width clamped by frame width and aspect target
     return {
       centerX: camera.width / 2,
       centerY: camera.height / 2,
@@ -83,100 +100,36 @@ export class SwipeDeckScene extends Phaser.Scene {
     };
   }
 
-  // prepare initial active, pending, and buffer slots
-  async buildInitialStack() {
-    this.activeCard = await this.createSlotCard(this.currentIndex, "active");
-    this.pendingCard = await this.createSlotCard(this.currentIndex + 1, "pending");
-    this.bufferCard = await this.createSlotCard(this.currentIndex + 2, "buffer");
-  }
-
-  // create a card only after its texture is guaranteed ready
-  async createSlotCard(profileIndex, slotType, shouldDrop = false) {
-    const profile = this.profiles[profileIndex];
-    if (!profile) return null;
-    await this.profileLoader.ensureTextureReady(profile);
-    const y = shouldDrop ? LAYOUT_CONFIG.bufferStartY : this.getSlotY(slotType);
-    const card = SwipeCard.create(this, profile, this.layout.centerX, y, this.layout);
-    if (slotType === "active") return this.styleActiveCard(card);
-    if (slotType === "pending") return this.stylePendingCard(card);
-    return this.styleBufferCard(card, shouldDrop);
-  }
-
-  // set active card visuals and interaction pose
-  styleActiveCard(card) {
-    card.setTopCardStyle();
-    card.x = this.layout.centerX;
-    card.y = this.getSlotY("active");
-    return card;
-  }
-
-  // set pending card visuals behind active card
-  stylePendingCard(card) {
-    card.setBackCardStyle();
-    card.setDepth(CARD_CONFIG.depthBack);
-    card.setScale(CARD_CONFIG.backScale);
-    card.x = this.layout.centerX;
-    card.y = this.getSlotY("pending");
-    return card;
-  }
-
-  // set buffer card visuals and optional top drop-in tween
-  styleBufferCard(card, shouldDrop) {
-    card.setBackCardStyle();
-    card.setDepth(CARD_CONFIG.depthBuffer);
-    card.setScale(CARD_CONFIG.bufferScale);
-    card.x = this.layout.centerX;
-    const targetY = this.getSlotY("buffer");
-    if (!shouldDrop) {
-      card.y = targetY;
-      return card;
-    }
-    this.tweens.add({
-      targets: card,
-      y: targetY,
-      duration: LAYOUT_CONFIG.bufferDropTweenMs,
-      ease: "Back.easeOut",
-    });
-    return card;
-  }
-
-  // return y position for each stack slot
-  getSlotY(slotType) {
-    if (slotType === "active") return this.layout.centerY;
-    if (slotType === "pending") return this.layout.centerY + LAYOUT_CONFIG.pendingOffsetY;
-    return this.layout.centerY + LAYOUT_CONFIG.bufferOffsetY;
-  }
-
   // forward drag target values into active card state
   moveActiveCard(dragX, dragY) {
-    if (!this.activeCard) return;
-    this.activeCard.setDragTarget(dragX, dragY);
+    this.stackManager.setActiveDragTarget(dragX, dragY);
   }
 
   // apply visual grabbed state at drag start
   handleDragStart() {
-    if (!this.activeCard) return;
+    if (!this.stackManager.getActiveCard()) return;
     this.isCardGrabbed = true;
-    this.activeCard.setGrabState(true);
+    this.stackManager.setActiveGrabbed(true);
   }
 
   // remove visual grabbed state when pointer releases
   handleDragEnd() {
-    if (!this.activeCard) return;
+    if (!this.stackManager.getActiveCard()) return;
     this.isCardGrabbed = false;
-    this.activeCard.setGrabState(false);
+    this.stackManager.setActiveGrabbed(false);
   }
 
   // resolve final swipe direction into throw/snap behavior
   handleSwipe(direction) {
-    if (!this.activeCard) return;
+    const activeCard = this.stackManager.getActiveCard();
+    if (!activeCard) return;
     this.isCardGrabbed = false;
-    this.activeCard.setGrabState(false);
+    this.stackManager.setActiveGrabbed(false);
     // block new input until tween/effect chain completes
     this.inputController.setEnabled(false);
-    this.flowController.resolveSwipe(
+    this.flowController.resolveSwipe( // pass current top card to throw/snap resolver
       direction,
-      this.activeCard,
+      activeCard,
       () => this.handleSnapBackComplete(),
       () => this.completeSwipe(direction)
     );
@@ -184,14 +137,15 @@ export class SwipeDeckScene extends Phaser.Scene {
 
   // after snapback, reset targets and re-enable input
   handleSnapBackComplete() {
-    if (!this.activeCard) return;
-    this.activeCard.resetDragTarget();
+    const activeCard = this.stackManager.getActiveCard();
+    if (!activeCard) return;
+    activeCard.resetDragTarget();
     this.inputController.setEnabled(true);
   }
 
   // route completed swipe to slash or hack path
   completeSwipe(direction) {
-    if (!this.activeCard) return;
+    if (!this.stackManager.getActiveCard()) return;
     const isCardSlashed = direction === SWIPE_DIRECTIONS.SLASH;
     if (isCardSlashed) return this.finishSlash();
     this.finishHack();
@@ -199,14 +153,28 @@ export class SwipeDeckScene extends Phaser.Scene {
 
   // slash path plays split animation before stack advance
   finishSlash() {
-    this.activeCard.playCutToPieces(() => this.advanceStack());
+    const activeCard = this.stackManager.getActiveCard();
+    if (!activeCard) return;
+    activeCard.playCutToPieces(() => this.advanceStack());
   }
 
   // hack path triggers handoff event then advances stack
   finishHack() {
-    const activeProfile = this.activeCard.profile;
-    this.routeToHackPath(activeProfile);
+    const activeProfile = this.stackManager.getActiveProfile();
+    if (!activeProfile) return;
+    this.onHackCommit(activeProfile); // write hacked id before leaving current card
+    this.routeToHackPath(activeProfile); // existing hook for minigame scene routing
     this.advanceStack();
+  }
+
+  /**
+   * save hacked profile id into global runtime store.
+   * input is committed hacked profile object.
+   * this provides data for future hacked list scene.
+   */
+  onHackCommit(profile) {
+    PersistenceManager.addHackedCardID(profile.id);
+    window.dispatchEvent(new CustomEvent("hack-commit", { detail: { profile, hackedCardIDs: PersistenceManager.getHackedCardIDs() } }));
   }
 
   // emit route event so external minigame flow can listen
@@ -218,53 +186,13 @@ export class SwipeDeckScene extends Phaser.Scene {
 
   // destroy old card and ask stack for next profile
   advanceStack() {
-    this.activeCard.destroy();
-    this.activeCard = null;
     this.isCardGrabbed = false;
-    this.currentIndex += 1;
-    this.promoteCardStack();
-    this.spawnBufferCard();
-    this.inputController.setEnabled(true);
-  }
-
-  // promote pending->active and buffer->pending after a swipe
-  promoteCardStack() {
-    this.activeCard = this.pendingCard;
-    this.pendingCard = this.bufferCard;
-    this.bufferCard = null;
-    if (this.activeCard) {
-      this.styleActiveCard(this.activeCard);
-    }
-    if (this.pendingCard) {
-      this.stylePendingCard(this.pendingCard);
-    }
-  }
-
-  // create the next buffer card and drop it from top of screen
-  async spawnBufferCard() {
-    this.bufferCard = await this.createSlotCard(this.currentIndex + 2, "buffer", true);
+    this.stackManager.commitResolvedCard().finally(() => this.inputController.setEnabled(true)); // unlock input after promotion and buffer spawn
   }
 
   // recompute bounds on resize and apply to current cards
   handleResize() {
     this.layout = this.computeCardLayout();
-    if (this.activeCard) {
-      this.activeCard.centerX = this.layout.centerX;
-      this.activeCard.centerY = this.layout.centerY;
-      this.activeCard.applyLayout(this.layout);
-      this.styleActiveCard(this.activeCard);
-    }
-    if (this.pendingCard) {
-      this.pendingCard.centerX = this.layout.centerX;
-      this.pendingCard.centerY = this.layout.centerY;
-      this.pendingCard.applyLayout(this.layout);
-      this.stylePendingCard(this.pendingCard);
-    }
-    if (this.bufferCard) {
-      this.bufferCard.centerX = this.layout.centerX;
-      this.bufferCard.centerY = this.layout.centerY;
-      this.bufferCard.applyLayout(this.layout);
-      this.styleBufferCard(this.bufferCard, false);
-    }
+    this.stackManager?.applyLayout();
   }
 }

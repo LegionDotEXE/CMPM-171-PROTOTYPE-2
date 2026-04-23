@@ -1,12 +1,12 @@
 import { SCENE_CONFIG } from "../constants/swipeConfig.js";
-import { SwipeCard } from "../objects/SwipeCard.js";
+import { ProfileCard } from "../objects/ProfileCard.js";
 
 export class ProfileLoader {
   // wrap profile data loading so scene stays focused on gameplay
   constructor(scene) {
     this.scene = scene;
-    this.textureWaiters = new Map();
-    this.scene.load.on("filecomplete", (key, type) => this.resolveTextureWaiters(key, type));
+    this.textureWaiters = new Map(); // textureKey -> callbacks waiting for that exact image
+    this.scene.load.on("filecomplete", (key, type) => this.resolveTextureWaiters(key, type)); // wake waiters when phaser reports load complete
   }
 
   // queue json and first image for fast first interaction
@@ -16,7 +16,7 @@ export class ProfileLoader {
     this.scene.load.once(`filecomplete-json-${SCENE_CONFIG.profileJsonKey}`, (_key, _type, data) => {
       const profiles = this.getValidProfiles(data?.profiles || []);
       if (!profiles.length) return;
-      profiles.slice(0, 3).forEach((profile) => SwipeCard.preload(this.scene, profile));
+      profiles.slice(0, 3).forEach((profile) => ProfileCard.preload(this.scene, profile)); // strict look-ahead startup: active + pending + buffer
     });
   }
 
@@ -30,7 +30,7 @@ export class ProfileLoader {
   loadRemainingProfiles(profiles) {
     // queue the rest after first render so startup feels snappy
     const queue = profiles.slice(1).filter((profile) => !this.scene.textures.exists(`profile_${profile.id}`));
-    queue.forEach((profile) => SwipeCard.preload(this.scene, profile));
+    queue.forEach((profile) => ProfileCard.preload(this.scene, profile));
     if (!queue.length) return;
     this.scene.time.delayedCall(SCENE_CONFIG.backgroundLoadDelayMs, () => this.startLoader());
   }
@@ -45,18 +45,18 @@ export class ProfileLoader {
   ensureTextureReady(profile, onReady) {
     const textureKey = `profile_${profile.id}`;
     if (this.scene.textures.exists(textureKey)) {
-      onReady?.();
+      onReady?.(); // run callback instantly if texture already cached
       return Promise.resolve();
     }
 
-    SwipeCard.preload(this.scene, profile);
+    ProfileCard.preload(this.scene, profile);
     const waitPromise = new Promise((resolve) => {
       const waiters = this.textureWaiters.get(textureKey) || [];
       waiters.push(() => {
         onReady?.();
         resolve();
       });
-      this.textureWaiters.set(textureKey, waiters);
+      this.textureWaiters.set(textureKey, waiters); // store callback so we can resolve when filecomplete arrives
     });
     this.startLoader();
     return waitPromise;

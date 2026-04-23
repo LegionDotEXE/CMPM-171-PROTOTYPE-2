@@ -17,6 +17,7 @@ export class HackEffect {
   // build dark green screen tint behind falling digits
   createBackdrop() {
     const camera = this.scene.cameras.main;
+    // full-screen rectangle centered on camera for quick hack tint layer
     return this.scene.add
       .rectangle(camera.width / 2, camera.height / 2, camera.width, camera.height, 0x022d12, 0.16)
       .setDepth(EFFECT_CONFIG.depth);
@@ -41,9 +42,9 @@ export class HackEffect {
       fontSize: "30px",
       fontFamily: "Courier New, monospace",
     });
-    column.setDepth(EFFECT_CONFIG.depth + 1).setAlpha(0.92);
-    column.setStroke("#4eff1f", 1);
-    column.setShadow(0, 0, "#2cff00", 10, true, true);
+    column.setDepth(EFFECT_CONFIG.depth + 1).setAlpha(0.92); // keep text above backdrop
+    column.setStroke("#4eff1f", 1); // subtle edge glow on characters
+    column.setShadow(0, 0, "#2cff00", 10, true, true); // fake neon bloom for hack look
     this.scene.tweens.add({
       targets: column,
       y: targetY,
@@ -70,7 +71,7 @@ export class HackEffect {
   animateBackdrop(backdrop, binaryColumns, onDone) {
     this.scene.tweens.add({
       targets: backdrop,
-      alpha: 0.4,
+      alpha: 0.4, // darken scene as hack effect ramps in
       duration: EFFECT_CONFIG.hackGrowMs,
       ease: "Sine.easeOut",
       onComplete: () => this.fadeOut(backdrop, binaryColumns, onDone),
