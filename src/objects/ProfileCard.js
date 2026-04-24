@@ -1,106 +1,146 @@
-import { CARD_CONFIG, LAYOUT_CONFIG } from "../constants/swipeConfig.js";
+import { CARD_CONFIG, CARD_STYLE, LAYOUT_CONFIG } from "../constants/swipeConfig.js";
 
-// one card in the swiper deck.
-// renders a 70/30 split (image on top, text on bottom) inside a phaser container
-// so every transform (drag, tilt, fade, split) affects the whole card as a unit.
+// one profile card in the swiper deck.
+// every visual choice lives in CARD_STYLE, every motion choice lives in
+// CARD_CONFIG. this file just composes them into a Phaser container.
+//
+// defensive: the constructor validates profile + bounds shape. bad data
+// produces a warning and a safe-default card (never throws, never crashes
+// the deck).
 export class ProfileCard extends Phaser.GameObjects.Container {
-  /**
-   * build one card positioned at (x, y) using profile data and a bounds box.
-   * input: scene reference, home position, profile object, layout bounds.
-   * this constructor creates all visuals in one pass (initLayout) so the
-   * scene stays minimal and only calls new ProfileCard(...) per card.
-   */
+  // build one card at (x, y) from a profile object and a bounds box.
+  // input: scene, home x, home y, profile object, { width, height } bounds.
+  // guard: rejects obviously-broken inputs by substituting safe defaults.
   constructor(scene, x, y, profile, bounds) {
     super(scene, x, y);
-    this.id = profile.id; // expose id so logic layer can record hacks by id
-    this.profile = profile; // full profile data (name, text, targetSceneKey)
-    this.bounds = bounds; // { width, height } card size from scene layout
-    this.centerX = x; // rest x used by spring-back tween
-    this.centerY = y; // rest y used by spring-back tween
+    const safeProfile = this.validateProfile(profile);
+    const safeBounds = this.validateBounds(bounds);
+    this.id = safeProfile.id;
+    this.profile = safeProfile;
+    this.bounds = safeBounds;
+    this.centerX = x;
+    this.centerY = y;
     this.initLayout();
     scene.add.existing(this);
   }
 
-  /**
-   * create the 70/30 split visuals in a single method.
-   * input: nothing (reads this.bounds and this.profile).
-   * this keeps layout math in one place so resizes and tweaks are easy.
-   */
+  // validate incoming profile data.
+  // output: a profile object guaranteed to have id + name + imagePath.
+  // missing fields trigger a warn and get replaced with empty strings /
+  // stable ids so render code never sees undefined.
+  validateProfile(profile) {
+    if (!profile || typeof profile !== "object") {
+      console.warn("[ProfileCard] missing profile object, using placeholder");
+      return { id: `missing_${Date.now()}`, name: "", text: "", imagePath: "" };
+    }
+    const safe = { ...profile };
+    if (safe.id == null) {
+      console.warn("[ProfileCard] profile missing id, assigning fallback");
+      safe.id = `missing_${Date.now()}`;
+    }
+    if (!safe.name) safe.name = "";
+    if (!safe.text) safe.text = "";
+    return safe;
+  }
+
+  // validate incoming bounds.
+  // output: { width, height } with sane positive numbers.
+  // zero or negative sizes get replaced with a minimum readable default.
+  validateBounds(bounds) {
+    const hasValidShape = bounds && typeof bounds === "object";
+    const width = hasValidShape && bounds.width > 0 ? bounds.width : LAYOUT_CONFIG.cardMinWidth;
+    const height = hasValidShape && bounds.height > 0 ? bounds.height : LAYOUT_CONFIG.cardMinWidth * LAYOUT_CONFIG.cardAspectTall;
+    if (!hasValidShape) console.warn("[ProfileCard] missing bounds, using config minimums");
+    return { width, height };
+  }
+
+  // build the 70/30 split visuals in a single method.
+  // every position + size is derived from this.bounds and CARD_STYLE
+  // percentages, so a single width/height change reflows everything.
   initLayout() {
     const { width, height } = this.bounds;
-    const textureKey = `profile_${this.id}`;
-
-    // top 70%: profile photo, anchored at the upper-center of the card.
-    // y offset = -height*0.15 puts its center in the top 70% area.
-    this.image = this.scene.add
-      .image(0, -height * 0.15, textureKey)
-      .setDisplaySize(width, height * LAYOUT_CONFIG.imageRatio);
-
-    // bottom 30%: red text panel used as a solid contrast backdrop.
-    // centered at height*0.35 (midpoint of the bottom third).
-    this.textPanel = this.scene.add.rectangle(
-      0,
-      height * 0.35,
-      width,
-      height * LAYOUT_CONFIG.textRatio,
-      0xd90910,
-      1
-    );
-
-    // name line shown first in the panel.
-    this.nameText = this.scene.add
-      .text(0, height * 0.3, this.profile.name || "", {
-        fontSize: "22px",
-        color: "#ffffff",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5);
-
-    // description line wrapped to fit inside the panel width.
-    this.descText = this.scene.add
-      .text(0, height * 0.4, this.profile.text || "", {
-        fontSize: "14px",
-        color: "#ffffff",
-        align: "center",
-        wordWrap: { width: width * 0.88, useAdvancedWrap: true },
-      })
-      .setOrigin(0.5);
-
+    this.image = this.buildImage(width, height);
+    this.textPanel = this.buildTextPanel(width, height);
+    this.nameText = this.buildNameText(width, height);
+    this.descText = this.buildDescText(width, height);
     this.add([this.image, this.textPanel, this.nameText, this.descText]);
   }
 
-  /**
-   * reflow all child visuals to match a new bounds box.
-   * input: { width, height } matching the scene's new card size.
-   * output: image/panel/text get repositioned and resized in-place.
-   * this is called by the scene on window resize so the deck keeps
-   * the right proportions without destroying and rebuilding cards.
-   */
-  applyLayout(newBounds) {
-    this.bounds = newBounds;
-    const { width, height } = newBounds;
-
-    // top image: same 70% ratio + same y-anchor math as initLayout.
-    this.image.setPosition(0, -height * 0.15);
-    this.image.setDisplaySize(width, height * LAYOUT_CONFIG.imageRatio);
-
-    // bottom panel: rebuild size so the rect matches the new card width/height.
-    this.textPanel.setPosition(0, height * 0.35);
-    this.textPanel.setSize(width, height * LAYOUT_CONFIG.textRatio);
-
-    // name + description: keep their positions inside the panel and
-    // update the description wrap width so long text reflows cleanly.
-    this.nameText.setPosition(0, height * 0.3);
-    this.descText.setPosition(0, height * 0.4);
-    this.descText.setWordWrapWidth(width * 0.88, true);
+  // build the top 70% image.
+  // if the texture is missing we fall back to a colored rectangle so the
+  // card still has a visible top half (never a broken white box).
+  buildImage(width, height) {
+    const textureKey = this.textureKey();
+    const imageY = height * CARD_STYLE.imageYPct;
+    const imageHeight = height * LAYOUT_CONFIG.imageRatio;
+    if (this.scene.textures.exists(textureKey)) {
+      const image = this.scene.add.image(0, imageY, textureKey);
+      image.setDisplaySize(width, imageHeight);
+      return image;
+    }
+    return this.scene.add.rectangle(0, imageY, width, imageHeight, CARD_STYLE.fallbackPanelColor, 1);
   }
 
-  /**
-   * unified tween helper that returns a promise.
-   * input: tween props, duration, ease. output: resolves when tween finishes.
-   * this is the ONLY animation entry point for the scene/logic layer,
-   * so every swipe/snap/throw uses the same predictable shape.
-   */
+  // build the bottom 30% red panel.
+  buildTextPanel(width, height) {
+    return this.scene.add.rectangle(
+      0,
+      height * CARD_STYLE.panelYPct,
+      width,
+      height * LAYOUT_CONFIG.textRatio,
+      CARD_STYLE.panelColor,
+      CARD_STYLE.panelAlpha
+    );
+  }
+
+  // build the name line that sits at the top of the panel.
+  buildNameText(width, height) {
+    return this.scene.add
+      .text(0, height * CARD_STYLE.nameYPct, this.profile.name, {
+        fontSize: CARD_STYLE.nameFontSize,
+        color: CARD_STYLE.nameColor,
+        fontStyle: CARD_STYLE.nameFontStyle,
+      })
+      .setOrigin(0.5);
+  }
+
+  // build the wrapped description line below the name.
+  buildDescText(width, height) {
+    return this.scene.add
+      .text(0, height * CARD_STYLE.descYPct, this.profile.text, {
+        fontSize: CARD_STYLE.descFontSize,
+        color: CARD_STYLE.descColor,
+        align: CARD_STYLE.descAlign,
+        wordWrap: { width: width * CARD_STYLE.wrapRatio, useAdvancedWrap: true },
+      })
+      .setOrigin(0.5);
+  }
+
+  // reflow every child for a new bounds box.
+  // called on window resize so the same card instance re-paints itself
+  // without being destroyed.
+  applyLayout(newBounds) {
+    const safeBounds = this.validateBounds(newBounds);
+    this.bounds = safeBounds;
+    const { width, height } = safeBounds;
+
+    if (this.image.setDisplaySize) {
+      this.image.setPosition(0, height * CARD_STYLE.imageYPct);
+      this.image.setDisplaySize(width, height * LAYOUT_CONFIG.imageRatio);
+    } else {
+      this.image.setPosition(0, height * CARD_STYLE.imageYPct);
+      this.image.setSize(width, height * LAYOUT_CONFIG.imageRatio);
+    }
+    this.textPanel.setPosition(0, height * CARD_STYLE.panelYPct);
+    this.textPanel.setSize(width, height * LAYOUT_CONFIG.textRatio);
+    this.nameText.setPosition(0, height * CARD_STYLE.nameYPct);
+    this.descText.setPosition(0, height * CARD_STYLE.descYPct);
+    this.descText.setWordWrapWidth(width * CARD_STYLE.wrapRatio, true);
+  }
+
+  // unified tween helper.
+  // this is the ONLY animation entry point used by SwipeLogic, so every
+  // swipe/snap/throw tween has the same predictable shape.
   animate(targetProps, duration = 300, ease = "Power2") {
     return new Promise((resolve) => {
       this.scene.tweens.add({
@@ -113,80 +153,89 @@ export class ProfileCard extends Phaser.GameObjects.Container {
     });
   }
 
-  /**
-   * quick grab feedback: scales the card slightly up/down.
-   * input: boolean. output: tweened scale change.
-   * separated from animate() because it is a tiny juice effect, not a commit.
-   */
+  // quick scale-up/down on grab/release for juice.
+  // kills any existing scale tween so repeated grabs don't pile up.
   setGrabState(isGrabbed) {
     this.scene.tweens.killTweensOf(this);
     const targetScale = isGrabbed ? CARD_CONFIG.grabScale : CARD_CONFIG.releaseScale;
     this.scene.tweens.add({
       targets: this,
       scale: targetScale,
-      duration: 110,
-      ease: "Sine.easeOut",
+      duration: CARD_STYLE.grabTweenMs,
+      ease: CARD_STYLE.grabEase,
     });
   }
 
-  /**
-   * slash animation: cuts the card texture into two halves that fly apart.
-   * input: none. output: promise that resolves when both halves finish.
-   * this is the slash "commit" visual, so logic can await it before promoting.
-   */
+  // slash commit visual: cut the card into two halves that fly apart.
+  // returns a promise so SwipeLogic can await the visual before promoting.
+  //
+  // safety: if the texture is missing, the halves are built as colored
+  // rectangles so the slash still plays.
   playSlashAnimation() {
     return new Promise((resolve) => {
       const [leftHalf, rightHalf] = this.createSlashHalves();
-      this.alpha = 0; // hide original card so halves are the only visible art
-
-      // left half flies left + down with negative rotation.
-      this.scene.tweens.add({
-        targets: leftHalf,
-        x: this.x - CARD_CONFIG.fragmentPushX,
-        y: this.y + CARD_CONFIG.fragmentFallY,
-        rotation: -CARD_CONFIG.fragmentRotate,
-        alpha: 0,
-        duration: CARD_CONFIG.fragmentTweenMs,
-        onComplete: () => leftHalf.destroy(),
-      });
-
-      // right half flies right + down with positive rotation.
-      // resolves the promise on the last tween so logic continues in order.
-      this.scene.tweens.add({
-        targets: rightHalf,
-        x: this.x + CARD_CONFIG.fragmentPushX,
-        y: this.y + CARD_CONFIG.fragmentFallY,
-        rotation: CARD_CONFIG.fragmentRotate,
-        alpha: 0,
-        duration: CARD_CONFIG.fragmentTweenMs,
-        onComplete: () => {
-          rightHalf.destroy();
-          resolve();
-        },
-      });
+      this.alpha = 0;
+      this.tweenSlashHalf(leftHalf, -1);
+      this.tweenSlashHalf(rightHalf, 1, resolve);
     });
   }
 
-  /**
-   * helper: create two cropped image copies representing the card halves.
-   * input: none. output: [leftHalf, rightHalf] image game objects.
-   * separated so playSlashAnimation stays short and focused on tweens.
-   */
+  // build one tween for a slash half.
+  // side is -1 (left) or 1 (right).
+  // if resolve is given, it fires on complete so the outer promise ends.
+  tweenSlashHalf(half, side, resolve) {
+    this.scene.tweens.add({
+      targets: half,
+      x: this.x + side * CARD_CONFIG.fragmentPushX,
+      y: this.y + CARD_CONFIG.fragmentFallY,
+      rotation: side * CARD_CONFIG.fragmentRotate,
+      alpha: 0,
+      duration: CARD_CONFIG.fragmentTweenMs,
+      onComplete: () => {
+        half.destroy();
+        if (resolve) resolve();
+      },
+    });
+  }
+
+  // create two cropped copies of the card texture for the slash.
+  // input: none. output: [leftHalf, rightHalf] Phaser game objects.
+  //
+  // fallback: if the texture is missing, returns two colored rectangles
+  // half-width each so the slash animation still runs safely.
   createSlashHalves() {
     const { width, height } = this.bounds;
-    const textureKey = `profile_${this.id}`;
+    const textureKey = this.textureKey();
+    if (!this.scene.textures.exists(textureKey)) {
+      return this.createFallbackHalves(width, height);
+    }
     const halfWidth = width / 2;
-
     const leftHalf = this.scene.add.image(this.x, this.y, textureKey);
     leftHalf.setDisplaySize(width, height);
     leftHalf.setCrop(0, 0, halfWidth, height);
     leftHalf.setDepth(this.depth + 2);
-
     const rightHalf = this.scene.add.image(this.x, this.y, textureKey);
     rightHalf.setDisplaySize(width, height);
     rightHalf.setCrop(halfWidth, 0, halfWidth, height);
     rightHalf.setDepth(this.depth + 2);
-
     return [leftHalf, rightHalf];
+  }
+
+  // fallback halves used when the texture is missing.
+  // same size + depth as the real halves so motion looks identical.
+  createFallbackHalves(width, height) {
+    const halfWidth = width / 2;
+    const leftHalf = this.scene.add.rectangle(this.x - halfWidth / 2, this.y, halfWidth, height, CARD_STYLE.fallbackPanelColor, 1);
+    const rightHalf = this.scene.add.rectangle(this.x + halfWidth / 2, this.y, halfWidth, height, CARD_STYLE.fallbackPanelColor, 1);
+    leftHalf.setDepth(this.depth + 2);
+    rightHalf.setDepth(this.depth + 2);
+    return [leftHalf, rightHalf];
+  }
+
+  // stable cache key for this card's texture.
+  // duplicated with ProfileLoader.textureKeyFor on purpose - we never want
+  // a circular import between objects/ and systems/.
+  textureKey() {
+    return `profile_${this.id}`;
   }
 }

@@ -14,13 +14,12 @@ export const States = Object.freeze({
 //   promote() -> promise that resolves when the next card is active
 //   onHackCommit(id) -> fire and forget hook for gamestate saving
 export class SwipeLogic {
-  /**
-   * construct the swipe logic around a scene + stack adapter.
-   * input: scene (for tweens/camera), stack adapter, optional overrides.
-   * default threshold/lerp/rotation come from shared config so tuning
-   * happens in one file.
-   */
+  // construct the swipe logic around a scene + stack adapter.
+  // input: scene (for tweens/camera), stack adapter, optional overrides.
+  // default threshold/lerp/rotation come from shared config so tuning
+  // happens in one file.
   constructor(scene, stack, options = {}) {
+    this.assertStackShape(stack);
     this.scene = scene;
     this.stack = stack;
     this.state = States.IDLE;
@@ -29,10 +28,25 @@ export class SwipeLogic {
     this.dragStartPointerX = 0; // captured on pointerdown so move math is consistent
   }
 
-  /**
-   * pointerdown entry: transition IDLE -> DRAGGING if a card exists.
-   * input: phaser pointer. ignores input while animating to prevent collisions.
-   */
+  // developer-facing contract check for the stack adapter.
+  // fails loudly with a clear message when wiring is wrong so bugs never
+  // slip silently into runtime. this is defensive programming: instead of
+  // a mystery "undefined is not a function" later, we get a named error
+  // right at construction.
+  assertStackShape(stack) {
+    if (!stack || typeof stack !== "object") {
+      throw new Error("[SwipeLogic] stack adapter is required");
+    }
+    if (typeof stack.getActive !== "function") {
+      throw new Error("[SwipeLogic] stack.getActive must be a function");
+    }
+    if (typeof stack.promote !== "function") {
+      throw new Error("[SwipeLogic] stack.promote must be a function");
+    }
+  }
+
+  // pointerdown entry: transition IDLE -> DRAGGING if a card exists.
+  // input: phaser pointer. ignores input while animating to prevent collisions.
   beginDrag(pointer) {
     if (this.state !== States.IDLE) return; // lock out during ANIMATING
     const card = this.stack.getActive();
@@ -42,12 +56,10 @@ export class SwipeLogic {
     card.setGrabState(true);
   }
 
-  /**
-   * pointermove handler: lerps the active card toward the pointer.
-   * input: phaser pointer. only runs while DRAGGING.
-   * formula: new = current + (target - current) * lerp
-   * rotation and alpha are mapped from drag distance for visual feedback.
-   */
+  // pointermove handler: lerps the active card toward the pointer.
+  // input: phaser pointer. only runs while DRAGGING.
+  // formula: new = current + (target - current) * lerp
+  // rotation and alpha are mapped from drag distance for visual feedback.
   handleMove(pointer) {
     if (this.state !== States.DRAGGING) return;
     const card = this.stack.getActive();
@@ -66,11 +78,9 @@ export class SwipeLogic {
     card.alpha = Phaser.Math.Clamp(mappedAlpha, CARD_CONFIG.minAlpha, 1);
   }
 
-  /**
-   * pointerup entry: decides commit vs snap-back.
-   * input: none (reads the card's current offset).
-   * DRAGGING -> ANIMATING during tween; IDLE again once resolved.
-   */
+  // pointerup entry: decides commit vs snap-back.
+  // input: none (reads the card's current offset).
+  // DRAGGING -> ANIMATING during tween; IDLE again once resolved.
   async handleRelease() {
     if (this.state !== States.DRAGGING) return;
     const card = this.stack.getActive();
@@ -89,10 +99,8 @@ export class SwipeLogic {
     this.state = States.IDLE;
   }
 
-  /**
-   * keyboard parity for desktop players.
-   * a = hack, d = slash. only fires from IDLE so typing mid-animation is ignored.
-   */
+  // keyboard parity for desktop players.
+  // a = hack, d = slash. only fires from IDLE so typing mid-animation is ignored.
   handleKey(event) {
     if (this.state !== States.IDLE) return;
     const key = event.key?.toLowerCase();
@@ -102,11 +110,9 @@ export class SwipeLogic {
     this.executeCommit(direction);
   }
 
-  /**
-   * spring-back tween for a cancelled/short swipe.
-   * input: card to reset. output: promise that resolves when tween ends.
-   * keeps the card at rest pose (centerX/centerY, zero angle, full alpha).
-   */
+  // spring-back tween for a cancelled/short swipe.
+  // input: card to reset. output: promise that resolves when tween ends.
+  // keeps the card at rest pose (centerX/centerY, zero angle, full alpha).
   snapBack(card) {
     return card.animate(
       { x: card.centerX, y: card.centerY, angle: 0, alpha: 1 },
@@ -115,13 +121,11 @@ export class SwipeLogic {
     );
   }
 
-  /**
-   * run the commit path for the given direction.
-   * input: "SLASH" or "HACK".
-   * SLASH plays the cut-in-half animation (stays in place, visual death).
-   * HACK records the id and throws the card off-screen left.
-   * both end with stack.promote() and returning state to IDLE.
-   */
+  // run the commit path for the given direction.
+  // input: "SLASH" or "HACK".
+  // SLASH plays the cut-in-half animation (stays in place, visual death).
+  // HACK records the id and throws the card off-screen left.
+  // both end with stack.promote() and returning state to IDLE.
   async executeCommit(direction) {
     const card = this.stack.getActive();
     if (!card) {
