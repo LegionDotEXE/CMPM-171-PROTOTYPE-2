@@ -1,4 +1,9 @@
-// shared direction labels used by SwipeLogic and ProfileCard.
+// single-source-of-truth config.
+// every magic number, color, ratio, and easing string the game uses
+// should live in one of the frozen blocks below. if you need to tune
+// the feel, change ONE value here and the whole system follows.
+
+// shared direction labels used by SwipeLogic, ProfileCard, and SwipeEffects.
 // strings (not numbers) so debug logs stay readable.
 export const SWIPE_DIRECTIONS = Object.freeze({
   SLASH: "SLASH",
@@ -7,7 +12,7 @@ export const SWIPE_DIRECTIONS = Object.freeze({
 });
 
 // core swipe + scene timing config.
-// every "magic number" that affects swipe feel lives here so tuning is easy.
+// swipeThreshold is the only value that affects "when" a commit fires.
 export const SCENE_CONFIG = Object.freeze({
   profileJsonKey: "profiles", // key used when reading json from phaser cache
   profileJsonPath: "src/data/profiles.json", // source path for deck data
@@ -20,7 +25,8 @@ export const SCENE_CONFIG = Object.freeze({
   throwHackAngle: -20, // tilt in degrees while the card flies away
 });
 
-// per-card visuals: scale, lerp, tilt, alpha, and slash fragment tweening.
+// per-card motion tuning: scale, lerp, tilt, alpha, and slash fragment tweening.
+// these are "physics" numbers - they affect how a card MOVES, not how it looks.
 export const CARD_CONFIG = Object.freeze({
   depthActive: 30, // render depth for the top/active card
   depthPending: 20, // render depth for the pending/back card
@@ -37,8 +43,30 @@ export const CARD_CONFIG = Object.freeze({
   fragmentTweenMs: 280, // slash animation duration
 });
 
-// overlay effect tuning for the slash blood + hack binary rain.
-// kept in one place so tweaking feel (count, speed, duration) is one edit.
+// per-card visual styling: colors, fonts, text positions.
+// these are "paint" numbers - they affect how a card LOOKS, not how it moves.
+// separated from CARD_CONFIG so designers can tweak look without touching physics.
+export const CARD_STYLE = Object.freeze({
+  panelColor: 0xd90910, // bottom panel fill color (crimson red)
+  panelAlpha: 1, // bottom panel opacity
+  nameFontSize: "22px", // profile name font size
+  nameColor: "#ffffff", // profile name color
+  nameFontStyle: "bold", // profile name weight
+  descFontSize: "14px", // description font size
+  descColor: "#ffffff", // description color
+  descAlign: "center", // description alignment
+  wrapRatio: 0.88, // description wrap width as % of card width
+  imageYPct: -0.15, // y offset for image center (negative = above card center)
+  panelYPct: 0.35, // y offset for panel center (positive = below card center)
+  nameYPct: 0.3, // y offset for name text
+  descYPct: 0.4, // y offset for description text
+  grabTweenMs: 110, // grab/release scale tween duration
+  grabEase: "Sine.easeOut", // easing for the grab puff
+  fallbackPanelColor: 0x333333, // neutral gray used if texture is missing
+});
+
+// overlay effect timing for the slash blood + hack binary rain.
+// colors and counts live in EFFECT_STYLE below so tuning feel vs look is separate.
 export const EFFECT_CONFIG = Object.freeze({
   depth: 80, // base depth so overlays sit above cards
   // slash blood decal + particle burst
@@ -62,13 +90,53 @@ export const EFFECT_CONFIG = Object.freeze({
   hackRainMaxMs: 2300, // slowest column fall
 });
 
-// phone-frame layout: determines card size and pending card offset.
+// colors and text styling for the overlay effects.
+// separated from EFFECT_CONFIG so art direction changes are one-file edits.
+export const EFFECT_STYLE = Object.freeze({
+  bloodParticleColor: 0xcf1010, // color of the small round particle sprites
+  bloodParticleSize: 22, // generated texture pixel size
+  bloodParticleRadius: 11, // circle radius inside generated texture
+  bloodParticleLifespanMs: 950, // how long each particle lives
+  bloodDecalColor: 0x8f0000, // dark red painted blood decal
+  bloodDecalAlpha: 0.78, // painted decal opacity
+  bloodBlobCount: 28, // number of random ellipses per splatter
+  bloodBlobMinR: 18, // min ellipse radius (multiplied by bloodScale)
+  bloodBlobMaxR: 56, // max ellipse radius (multiplied by bloodScale)
+  hackTintColor: 0x022d12, // dark green backdrop tint
+  hackTintAlphaStart: 0.16, // tint opacity before grow
+  hackTintAlphaPeak: 0.4, // tint opacity at peak during hack
+  hackTextColor: "#9dff62", // falling digits color
+  hackTextStrokeColor: "#4eff1f", // digit outline color
+  hackTextShadowColor: "#2cff00", // digit glow shadow color
+  hackTextShadowBlur: 10, // glow blur radius
+  hackTextFontSize: "30px", // digit font size
+  hackTextFontFamily: "Courier New, monospace", // digit font family
+  hackSpawnYOffset: -420, // y where each column spawns (above screen)
+  hackExtraFallY: 280, // extra fall distance past camera bottom
+  hackColumnAlpha: 0.92, // column text opacity
+  hackColumnStrokeWidth: 1, // outline thickness on digits
+});
+
+// phone-frame layout: percentage-based so every screen fits the same feel.
+// card size is derived from camera dimensions * pct, clamped by min/max so
+// tiny or huge screens still look reasonable.
 export const LAYOUT_CONFIG = Object.freeze({
   imageRatio: 0.7, // top 70% of the card is the profile image
   textRatio: 0.3, // bottom 30% is the name/description panel
-  frameInsets: { top: 60, right: 48, bottom: 60, left: 48 }, // manual phone safe area
-  cardMaxAspect: 0.72, // width/height cap so portrait cards stay tall
+  cardWidthPct: 0.85, // card width as fraction of camera width
+  cardHeightPct: 0.82, // card height as fraction of camera height
+  cardAspectTall: 1.5, // preferred height / width for a portrait card
+  cardMinWidth: 220, // never render cards narrower than this
+  cardMaxWidth: 520, // never render cards wider than this
   pendingOffsetY: 14, // pending card sits this far below active
   pendingDropStartY: -500, // pending "drops in" from this y after promotion
   pendingDropTweenMs: 400, // drop-in duration
+});
+
+// progressive asset loader tuning.
+// small numbers because we only have a handful of profiles; scaling up
+// is as simple as increasing initialBatchSize.
+export const LOADER_CONFIG = Object.freeze({
+  initialBatchSize: 3, // how many profile images to load before first render
+  backgroundDelayMs: 200, // delay before idle-time background loading begins
 });
