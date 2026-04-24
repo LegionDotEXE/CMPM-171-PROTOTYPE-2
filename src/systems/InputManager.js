@@ -23,8 +23,18 @@ export class SwipeLogic {
     this.scene = scene;
     this.stack = stack;
     this.state = States.IDLE;
-    this.threshold = options.threshold ?? SCENE_CONFIG.swipeThreshold;
-    this.effects = options.effects ?? null; // optional SwipeEffects instance for overlays
+    // use caller-provided threshold if given, otherwise fall back to config default
+    if (options.threshold !== undefined) {
+      this.threshold = options.threshold;
+    } else {
+      this.threshold = SCENE_CONFIG.swipeThreshold;
+    }
+    // default to no effects when none provided so overlay calls can be skipped safely
+    if (options.effects) {
+      this.effects = options.effects;
+    } else {
+      this.effects = null;
+    }
     this.dragStartPointerX = 0; // captured on pointerdown so move math is consistent
   }
 
@@ -103,10 +113,18 @@ export class SwipeLogic {
   // a = hack, d = slash. only fires from IDLE so typing mid-animation is ignored.
   handleKey(event) {
     if (this.state !== States.IDLE) return;
-    const key = event.key?.toLowerCase();
+    // bail early if the event does not carry a key (modifier-only events)
+    if (!event.key) return;
+    const key = event.key.toLowerCase();
     if (key !== "a" && key !== "d") return;
     this.state = States.ANIMATING;
-    const direction = key === "d" ? SWIPE_DIRECTIONS.SLASH : SWIPE_DIRECTIONS.HACK;
+    // pick direction based on key: d means slash (right), a means hack (left)
+    let direction;
+    if (key === "d") {
+      direction = SWIPE_DIRECTIONS.SLASH;
+    } else {
+      direction = SWIPE_DIRECTIONS.HACK;
+    }
     this.executeCommit(direction);
   }
 
@@ -134,14 +152,28 @@ export class SwipeLogic {
     }
 
     if (direction === SWIPE_DIRECTIONS.SLASH) {
+      // play overlay only if effects subsystem is wired, otherwise use a no-op promise
+      let slashOverlayPromise;
+      if (this.effects) {
+        slashOverlayPromise = this.effects.play(direction, card.x, card.y);
+      } else {
+        slashOverlayPromise = Promise.resolve();
+      }
       // slash plays the cut-in-half card animation AND the blood overlay together.
       // Promise.all keeps both visuals synchronized without extra state tracking.
-      await Promise.all([
-        card.playSlashAnimation(),
-        this.effects ? this.effects.play(direction, card.x, card.y) : Promise.resolve(),
-      ]);
+      await Promise.all([card.playSlashAnimation(), slashOverlayPromise]);
     } else {
-      this.stack.onHackCommit?.(card.id);
+      // notify the stack so gamestate can persist this hack, only if a hook was wired
+      if (typeof this.stack.onHackCommit === "function") {
+        this.stack.onHackCommit(card.id);
+      }
+      // play overlay only if effects subsystem is wired, otherwise use a no-op promise
+      let hackOverlayPromise;
+      if (this.effects) {
+        hackOverlayPromise = this.effects.play(direction);
+      } else {
+        hackOverlayPromise = Promise.resolve();
+      }
       // hack: throw card off-screen AND play the binary rain overlay together.
       await Promise.all([
         card.animate(
@@ -154,7 +186,7 @@ export class SwipeLogic {
           SCENE_CONFIG.throwTweenMs,
           "Quad.easeIn"
         ),
-        this.effects ? this.effects.play(direction) : Promise.resolve(),
+        hackOverlayPromise,
       ]);
     }
 

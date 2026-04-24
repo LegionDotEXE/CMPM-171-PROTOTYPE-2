@@ -63,7 +63,12 @@ export const HackOverlay = {
   makeBinaryText() {
     const digits = [];
     for (let i = 0; i < EFFECT_CONFIG.hackBinaryLength; i += 1) {
-      digits.push(Math.random() > 0.5 ? "1" : "0");
+      // random bit: 1 or 0 based on a coin flip
+      if (Math.random() > 0.5) {
+        digits.push("1");
+      } else {
+        digits.push("0");
+      }
     }
     return digits.join("\n");
   },

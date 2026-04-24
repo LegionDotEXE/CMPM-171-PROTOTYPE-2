@@ -114,12 +114,14 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.stylePending(this.pendingCard);
   }
 
-  // create one ProfileCard or null if index is past the deck OR if the
-  // texture isn't loaded yet (background load still running).
+  // create one ProfileCard, or null only if the index is past the end of the deck.
+  // we intentionally do NOT gate on texture readiness here: ProfileCard.buildImage
+  // already falls back to a colored rectangle when the texture is missing, so
+  // creating the card anyway keeps deck length stable and lets the background
+  // loader swap the real texture in on its own later.
   createCard(profileIndex) {
     if (profileIndex >= this.profiles.length) return null;
     const profile = this.profiles[profileIndex];
-    if (!ProfileLoader.isTextureReady(this, profile)) return null;
     return new ProfileCard(this, this.bounds.centerX, this.bounds.centerY, profile, this.bounds);
   }
 
@@ -173,7 +175,10 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.input.on("pointerdown", this.pointerDownHandler);
     this.input.on("pointermove", this.pointerMoveHandler);
     this.input.on("pointerup", this.pointerUpHandler);
-    this.input.keyboard?.on("keydown", this.keyDownHandler);
+    // only bind keyboard if phaser keyboard input is available (disabled in some configs)
+    if (this.input.keyboard) {
+      this.input.keyboard.on("keydown", this.keyDownHandler);
+    }
   }
 
   // promotion sequence (no-pop guarantee):
@@ -245,7 +250,10 @@ export class SwipeDeckScene extends Phaser.Scene {
     if (this.pointerDownHandler) this.input.off("pointerdown", this.pointerDownHandler);
     if (this.pointerMoveHandler) this.input.off("pointermove", this.pointerMoveHandler);
     if (this.pointerUpHandler) this.input.off("pointerup", this.pointerUpHandler);
-    if (this.keyDownHandler) this.input.keyboard?.off("keydown", this.keyDownHandler);
+    // only detach keyboard listener if both the handler and phaser keyboard input exist
+    if (this.keyDownHandler && this.input.keyboard) {
+      this.input.keyboard.off("keydown", this.keyDownHandler);
+    }
     this.pointerDownHandler = null;
     this.pointerMoveHandler = null;
     this.pointerUpHandler = null;

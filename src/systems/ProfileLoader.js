@@ -23,8 +23,11 @@ export const ProfileLoader = {
   // input: scene. output: array of valid profile objects.
   getValidProfiles(scene) {
     const data = scene.cache.json.get(SCENE_CONFIG.profileJsonKey);
-    const raw = data?.profiles ?? [];
-    return raw.filter((profile) => this.isProfileRenderable(profile));
+    // bail early if the cache entry is missing (json failed to load)
+    if (!data) return [];
+    // bail early if the profiles field is not an array
+    if (!Array.isArray(data.profiles)) return [];
+    return data.profiles.filter((profile) => this.isProfileRenderable(profile));
   },
 
   // minimum contract for a profile object to be renderable.

@@ -1,5 +1,16 @@
 import { CARD_CONFIG, CARD_STYLE, LAYOUT_CONFIG } from "../constants/swipeConfig.js";
 
+// monotonic counter for fallback ids when a profile is missing or has no id.
+// using a module-level counter instead of Date.now() guarantees uniqueness even
+// when multiple broken cards are created inside the same millisecond (loops,
+// batch operations, etc). this prevents texture cache key collisions like two
+// different cards both mapping to "profile_missing_1713456789".
+let fallbackIdCounter = 0;
+function nextFallbackId() {
+  fallbackIdCounter += 1;
+  return `missing_${fallbackIdCounter}`;
+}
+
 // one profile card in the swiper deck.
 // every visual choice lives in CARD_STYLE, every motion choice lives in
 // CARD_CONFIG. this file just composes them into a Phaser container.
@@ -31,12 +42,12 @@ export class ProfileCard extends Phaser.GameObjects.Container {
   validateProfile(profile) {
     if (!profile || typeof profile !== "object") {
       console.warn("[ProfileCard] missing profile object, using placeholder");
-      return { id: `missing_${Date.now()}`, name: "", text: "", imagePath: "" };
+      return { id: nextFallbackId(), name: "", text: "", imagePath: "" };
     }
     const safe = { ...profile };
     if (safe.id == null) {
       console.warn("[ProfileCard] profile missing id, assigning fallback");
-      safe.id = `missing_${Date.now()}`;
+      safe.id = nextFallbackId();
     }
     if (!safe.name) safe.name = "";
     if (!safe.text) safe.text = "";
@@ -48,8 +59,20 @@ export class ProfileCard extends Phaser.GameObjects.Container {
   // zero or negative sizes get replaced with a minimum readable default.
   validateBounds(bounds) {
     const hasValidShape = bounds && typeof bounds === "object";
-    const width = hasValidShape && bounds.width > 0 ? bounds.width : LAYOUT_CONFIG.cardMinWidth;
-    const height = hasValidShape && bounds.height > 0 ? bounds.height : LAYOUT_CONFIG.cardMinWidth * LAYOUT_CONFIG.cardAspectTall;
+    // use caller width if bounds object is valid and positive, otherwise fall back to config minimum
+    let width;
+    if (hasValidShape && bounds.width > 0) {
+      width = bounds.width;
+    } else {
+      width = LAYOUT_CONFIG.cardMinWidth;
+    }
+    // use caller height if bounds object is valid and positive, otherwise derive from min width and aspect
+    let height;
+    if (hasValidShape && bounds.height > 0) {
+      height = bounds.height;
+    } else {
+      height = LAYOUT_CONFIG.cardMinWidth * LAYOUT_CONFIG.cardAspectTall;
+    }
     if (!hasValidShape) console.warn("[ProfileCard] missing bounds, using config minimums");
     return { width, height };
   }
@@ -157,7 +180,13 @@ export class ProfileCard extends Phaser.GameObjects.Container {
   // kills any existing scale tween so repeated grabs don't pile up.
   setGrabState(isGrabbed) {
     this.scene.tweens.killTweensOf(this);
-    const targetScale = isGrabbed ? CARD_CONFIG.grabScale : CARD_CONFIG.releaseScale;
+    // pick scale based on grab state: puff up on grab, return to rest on release
+    let targetScale;
+    if (isGrabbed) {
+      targetScale = CARD_CONFIG.grabScale;
+    } else {
+      targetScale = CARD_CONFIG.releaseScale;
+    }
     this.scene.tweens.add({
       targets: this,
       scale: targetScale,
