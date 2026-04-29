@@ -1,5 +1,6 @@
 import { TitleScreenScene } from "./src/scenes/TitleScreen.js";
 import { SwipeDeckScene } from "./src/scenes/SwipeDeckScene.js";
+import { StorageScene } from "./src/scenes/StorageScene.js";
 
 const { Phaser } = window;
 
@@ -19,7 +20,7 @@ const gameConfig = {
     windowEvents: true,
     touch: { capture: true },
   },
-  scene: [TitleScreenScene, SwipeDeckScene],
+  scene: [TitleScreenScene, SwipeDeckScene, StorageScene],
 };
 
 if (!Phaser) {

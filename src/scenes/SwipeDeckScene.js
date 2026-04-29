@@ -2,8 +2,8 @@ import { ProfileCard } from "../objects/ProfileCard.js";
 import { SwipeLogic } from "../systems/InputManager.js";
 import { SwipeEffects } from "../systems/SwipeEffects.js";
 import { ProfileLoader } from "../systems/ProfileLoader.js";
-import { GameState } from "../systems/GameState.js";
-import { CARD_CONFIG, LAYOUT_CONFIG, LOADER_CONFIG, SCENE_CONFIG } from "../constants/swipeConfig.js";
+import { PersistenceManager } from "../systems/PersistenceManager.js";
+import { BACKGROUND_CONFIG, CARD_CONFIG, LAYOUT_CONFIG, LOADER_CONFIG, SCENE_CONFIG } from "../constants/swipeConfig.js";
 
 // orchestrator scene. every piece of real gameplay logic lives in other
 // modules - this scene just wires them together and owns deck pointers.
@@ -31,17 +31,28 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.pointerMoveHandler = null;
     this.pointerUpHandler = null;
     this.keyDownHandler = null;
+    this.backgroundImage = null; // blurred phone bg behind cards (fit, never stretched)
+    this.backgroundDisplayWidth = 0; // displayed bg width after fit-scaling
+    this.backgroundDisplayHeight = 0; // displayed bg height after fit-scaling
+    this.collectionBtn = null; // top-left button that opens the StorageScene
   }
 
-  // preload: json only. images are queued later by ProfileLoader once we
-  // know which ones are valid.
+  // preload: profiles json + the shared phone background. profile images are
+  // queued later by ProfileLoader once we know which ones are valid.
   preload() {
     ProfileLoader.preloadJson(this);
+    if (!this.textures.exists(BACKGROUND_CONFIG.phoneTextureKey)) {
+      this.load.image(BACKGROUND_CONFIG.phoneTextureKey, BACKGROUND_CONFIG.phoneImagePath);
+    }
   }
 
-  // create: read profiles, start progressive load, wire resize/shutdown.
-  // when the initial batch finishes, startGameplay builds the stack.
+  // create: paint background, read profiles, start progressive load, wire
+  // resize/shutdown. when the initial batch finishes, startGameplay builds
+  // the stack and the collection button is wired up.
   create() {
+    this.setupBackground();
+    this.setupCollectionButton();
+
     this.profiles = ProfileLoader.getValidProfiles(this);
     if (!this.profiles.length) return;
 
@@ -50,11 +61,64 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.beginProgressiveLoad();
   }
 
+  // blurred phone background, sits behind every gameplay element.
+  // never stretched - we fit-scale it (Math.min) so the phone frame keeps
+  // its native aspect ratio and we letterbox any extra camera space.
+  setupBackground() {
+    if (!this.textures.exists(BACKGROUND_CONFIG.phoneTextureKey)) return;
+    const camera = this.cameras.main;
+    this.backgroundImage = this.add
+      .image(camera.width / 2, camera.height / 2, BACKGROUND_CONFIG.phoneTextureKey)
+      .setDepth(BACKGROUND_CONFIG.depth);
+    this.fitBackground();
+  }
+
+  // recompute bg scale + position for the current camera size.
+  // also caches the displayed bg dimensions so computeBounds can size the
+  // card relative to the visible phone frame (not the raw camera).
+  fitBackground() {
+    if (!this.backgroundImage) return;
+    const camera = this.cameras.main;
+    const source = this.backgroundImage.texture.getSourceImage();
+    const baseWidth = source.width;
+    const baseHeight = source.height;
+    if (baseWidth <= 0 || baseHeight <= 0) return;
+    const scale = Math.min(camera.width / baseWidth, camera.height / baseHeight);
+    this.backgroundImage.setScale(scale);
+    this.backgroundImage.setPosition(camera.width / 2, camera.height / 2);
+    this.backgroundDisplayWidth = baseWidth * scale;
+    this.backgroundDisplayHeight = baseHeight * scale;
+  }
+
+  // top-left "Collection" button that opens the StorageScene.
+  // sits outside the phone frame so it can't overlap a swipe.
+  setupCollectionButton() {
+    this.collectionBtn = this.add
+      .text(20, 20, "Collection", {
+        fontSize: "18px",
+        color: "#ffffff",
+        backgroundColor: "#222a",
+        padding: { x: 12, y: 8 },
+      })
+      .setDepth(100)
+      .setInteractive({ useHandCursor: true });
+    // sleep+launch instead of start: keeps this deck frozen in memory so
+    // currentIndex / animation state / inputs all survive the round-trip
+    // through the storage screen.
+    this.collectionBtn.on("pointerup", () => {
+      this.scene.sleep("SwipeDeck");
+      this.scene.launch("Storage");
+    });
+  }
+
   // subscribe to the scene-level events we care about.
   // kept in one method so cleanup() can mirror every binding exactly.
+  // wake refreshes layout in case the window was resized while we were
+  // sleeping behind the storage scene.
   bindSceneLifecycle() {
     this.resizeHandler = () => this.handleResize();
     this.scale.on("resize", this.resizeHandler);
+    this.events.on("wake", () => this.handleResize());
     this.events.once("shutdown", () => this.cleanup());
     this.events.once("destroy", () => this.cleanup());
   }
@@ -82,24 +146,30 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.setupInput();
   }
 
-  // compute card size from the camera using percentages (Pillar 9).
-  // responsive: works on phone portrait, desktop landscape, and vertical
-  // monitor without editing a single pixel value.
+  // compute card size relative to the displayed phone background.
+  // when the bg has been fit-scaled we size the card off of THAT (not the
+  // raw camera), so the card always lives inside the phone frame's screen
+  // area regardless of window size. fallback to camera dims if no bg yet.
   //
-  // width  = camera.width  * cardWidthPct  (clamped by min/max)
-  // height = min(camera.height * cardHeightPct, width * aspectTall)
+  // width  = baseWidth  * cardWidthPct  (clamped by min/max)
+  // height = min(baseHeight * cardHeightPct, width * aspectTall)
+  // centerY is shifted so the card sits centered on the phone SCREEN, not
+  // the bg art's geometric center (the home button strip pulls it down).
   computeBounds() {
     const camera = this.cameras.main;
-    const uncappedWidth = camera.width * LAYOUT_CONFIG.cardWidthPct;
+    const baseWidth = this.backgroundDisplayWidth > 0 ? this.backgroundDisplayWidth : camera.width;
+    const baseHeight = this.backgroundDisplayHeight > 0 ? this.backgroundDisplayHeight : camera.height;
+    const uncappedWidth = baseWidth * LAYOUT_CONFIG.cardWidthPct;
     const width = Phaser.Math.Clamp(uncappedWidth, LAYOUT_CONFIG.cardMinWidth, LAYOUT_CONFIG.cardMaxWidth);
-    const maxHeightByScreen = camera.height * LAYOUT_CONFIG.cardHeightPct;
+    const maxHeightByScreen = baseHeight * LAYOUT_CONFIG.cardHeightPct;
     const maxHeightByAspect = width * LAYOUT_CONFIG.cardAspectTall;
     const height = Math.min(maxHeightByScreen, maxHeightByAspect);
+    const centerYOffset = baseHeight * BACKGROUND_CONFIG.innerScreenCenterYOffsetPct;
     return {
       width,
       height,
       centerX: camera.width / 2,
-      centerY: camera.height / 2,
+      centerY: camera.height / 2 + centerYOffset,
     };
   }
 
@@ -213,13 +283,13 @@ export class SwipeDeckScene extends Phaser.Scene {
     });
   }
 
-  // hack-commit hook. writes id into global GameState and fires a
+  // hack-commit hook. writes id into PersistenceManager and fires a
   // window CustomEvent so other scenes/UI can subscribe without importing.
   onHackCommit(profileId) {
-    GameState.recordHack(profileId);
+    PersistenceManager.recordHack(profileId);
     window.dispatchEvent(
       new CustomEvent("hack-commit", {
-        detail: { profileId, hackedIds: GameState.getHackedIDs() },
+        detail: { profileId, hackedIds: PersistenceManager.getHackedCardIDs() },
       })
     );
   }
@@ -250,10 +320,13 @@ export class SwipeDeckScene extends Phaser.Scene {
     // intentionally empty - fill in with your redirect / minigame launch.
   }
 
-  // reflow every live card for a new viewport.
+  // reflow every live card + background for a new viewport.
+  // order matters: fit the bg FIRST so backgroundDisplayWidth/Height are
+  // fresh, then computeBounds reads them when sizing the card.
   // skips if computed bounds are degenerate (eg. zero-size window during
   // transition) so applyLayout never receives nonsense numbers.
   handleResize() {
+    this.fitBackground();
     const next = this.computeBounds();
     if (next.width <= 0 || next.height <= 0) return;
     this.bounds = next;
@@ -285,5 +358,10 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.pointerMoveHandler = null;
     this.pointerUpHandler = null;
     this.keyDownHandler = null;
+    if (this.collectionBtn) {
+      this.collectionBtn.removeAllListeners();
+      this.collectionBtn = null;
+    }
+    this.backgroundImage = null;
   }
 }

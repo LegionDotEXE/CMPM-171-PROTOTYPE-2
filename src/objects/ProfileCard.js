@@ -12,8 +12,8 @@ function nextFallbackId() {
 }
 
 // one profile card in the swiper deck.
-// every visual choice lives in CARD_STYLE, every motion choice lives in
-// CARD_CONFIG. this file just composes them into a Phaser container.
+// the card is just the profile PNG (name + description are baked into the
+// art now), so this container only holds a single image child.
 //
 // defensive: the constructor validates profile + bounds shape. bad data
 // produces a warning and a safe-default card (never throws, never crashes
@@ -77,69 +77,29 @@ export class ProfileCard extends Phaser.GameObjects.Container {
     return { width, height };
   }
 
-  // build the 70/30 split visuals in a single method.
-  // every position + size is derived from this.bounds and CARD_STYLE
-  // percentages, so a single width/height change reflows everything.
+  // build the single image visual sized to the full bounds.
+  // image fills width/height; if the texture is missing we drop in a colored
+  // rectangle so the card is never invisible.
   initLayout() {
     const { width, height } = this.bounds;
     this.image = this.buildImage(width, height);
-    this.textPanel = this.buildTextPanel(width, height);
-    this.nameText = this.buildNameText(width, height);
-    this.descText = this.buildDescText(width, height);
-    this.add([this.image, this.textPanel, this.nameText, this.descText]);
+    this.add([this.image]);
   }
 
-  // build the top 70% image.
+  // build the card image (full bounds, centered at 0,0 inside the container).
   // if the texture is missing we fall back to a colored rectangle so the
-  // card still has a visible top half (never a broken white box).
+  // card is never a broken white box.
   buildImage(width, height) {
     const textureKey = this.textureKey();
-    const imageY = height * CARD_STYLE.imageYPct;
-    const imageHeight = height * LAYOUT_CONFIG.imageRatio;
     if (this.scene.textures.exists(textureKey)) {
-      const image = this.scene.add.image(0, imageY, textureKey);
-      image.setDisplaySize(width, imageHeight);
+      const image = this.scene.add.image(0, 0, textureKey);
+      image.setDisplaySize(width, height);
       return image;
     }
-    return this.scene.add.rectangle(0, imageY, width, imageHeight, CARD_STYLE.fallbackPanelColor, 1);
+    return this.scene.add.rectangle(0, 0, width, height, CARD_STYLE.fallbackPanelColor, 1);
   }
 
-  // build the bottom 30% red panel.
-  buildTextPanel(width, height) {
-    return this.scene.add.rectangle(
-      0,
-      height * CARD_STYLE.panelYPct,
-      width,
-      height * LAYOUT_CONFIG.textRatio,
-      CARD_STYLE.panelColor,
-      CARD_STYLE.panelAlpha
-    );
-  }
-
-  // build the name line that sits at the top of the panel.
-  buildNameText(width, height) {
-    return this.scene.add
-      .text(0, height * CARD_STYLE.nameYPct, this.profile.name, {
-        fontSize: CARD_STYLE.nameFontSize,
-        color: CARD_STYLE.nameColor,
-        fontStyle: CARD_STYLE.nameFontStyle,
-      })
-      .setOrigin(0.5);
-  }
-
-  // build the wrapped description line below the name.
-  buildDescText(width, height) {
-    return this.scene.add
-      .text(0, height * CARD_STYLE.descYPct, this.profile.text, {
-        fontSize: CARD_STYLE.descFontSize,
-        color: CARD_STYLE.descColor,
-        align: CARD_STYLE.descAlign,
-        wordWrap: { width: width * CARD_STYLE.wrapRatio, useAdvancedWrap: true },
-      })
-      .setOrigin(0.5);
-  }
-
-  // reflow every child for a new bounds box.
+  // reflow the image for a new bounds box.
   // called on window resize so the same card instance re-paints itself
   // without being destroyed.
   applyLayout(newBounds) {
@@ -148,17 +108,12 @@ export class ProfileCard extends Phaser.GameObjects.Container {
     const { width, height } = safeBounds;
 
     if (this.image.setDisplaySize) {
-      this.image.setPosition(0, height * CARD_STYLE.imageYPct);
-      this.image.setDisplaySize(width, height * LAYOUT_CONFIG.imageRatio);
+      this.image.setPosition(0, 0);
+      this.image.setDisplaySize(width, height);
     } else {
-      this.image.setPosition(0, height * CARD_STYLE.imageYPct);
-      this.image.setSize(width, height * LAYOUT_CONFIG.imageRatio);
+      this.image.setPosition(0, 0);
+      this.image.setSize(width, height);
     }
-    this.textPanel.setPosition(0, height * CARD_STYLE.panelYPct);
-    this.textPanel.setSize(width, height * LAYOUT_CONFIG.textRatio);
-    this.nameText.setPosition(0, height * CARD_STYLE.nameYPct);
-    this.descText.setPosition(0, height * CARD_STYLE.descYPct);
-    this.descText.setWordWrapWidth(width * CARD_STYLE.wrapRatio, true);
   }
 
   // unified tween helper.
