@@ -74,6 +74,8 @@ export class ProfileDetailScene extends Phaser.Scene {
 
     // double-fire guard for action buttons
     this._buttonLocked = false;
+
+    this._cursorText = null;
   }
 
   init(data) {
@@ -106,6 +108,7 @@ export class ProfileDetailScene extends Phaser.Scene {
     this.isPointerDown = false;
     this._suppressScroll = false;
     this._buttonLocked = false;
+    this._cursorText = null;
 
     this.input.topOnly = false;
 
@@ -119,12 +122,14 @@ export class ProfileDetailScene extends Phaser.Scene {
     this.panelY = Math.floor((cam.height - this.panelH) / 2);
 
     this.createBackground(cam);
+    this.createScanlines(cam);
     this.createPanel();
     this.createScrollContent();
     this.applyScrollMask();
     this.createButtons();   
     this.bindInput();
     this.bindLifecycle();
+    this.playEntryGlitch();
   }
 
   shutdown() {
@@ -137,6 +142,16 @@ export class ProfileDetailScene extends Phaser.Scene {
       .rectangle(cam.width / 2, cam.height / 2, cam.width, cam.height, DETAIL_STYLE.bgColor, 1)
       .setOrigin(0.5)
       .setDepth(0);
+  }
+
+  createScanlines(cam) {
+    const g = this.add.graphics().setDepth(50).setAlpha(0.15);
+    const lineH = 3;
+    const gap   = 3;
+    for (let scanY = 0; scanY < cam.height; scanY += lineH + gap) {
+      g.fillStyle(0x000000, 1);
+      g.fillRect(0, scanY, cam.width, lineH);
+    }
   }
 
   // draw the bounded panel: dark fill + green border.
@@ -158,6 +173,30 @@ export class ProfileDetailScene extends Phaser.Scene {
     const border = this.add.graphics().setDepth(2);
     border.lineStyle(DETAIL_STYLE.panelBorderWidth, DETAIL_STYLE.panelBorderColor, 1);
     border.strokeRect(this.panelX, this.panelY, this.panelW, this.panelH);
+
+    const inner = this.add.graphics().setDepth(2);
+    inner.lineStyle(1, 0x004422, 0.5);
+    inner.strokeRect(this.panelX + 4, this.panelY + 4, this.panelW - 8, this.panelH - 8);
+
+    this.drawCornerBrackets(this.panelX, this.panelY, this.panelW, this.panelH, 22, 3);
+  }
+
+  drawCornerBrackets(x, y, w, h, size, thickness) {
+    const g = this.add.graphics().setDepth(3);
+    g.lineStyle(thickness, 0x00ff88, 1);
+    const corners = [
+      [x,     y,      1,  1],
+      [x + w, y,     -1,  1],
+      [x,     y + h,  1, -1],
+      [x + w, y + h, -1, -1],
+    ];
+    corners.forEach(([cx2, cy2, sx, sy]) => {
+      g.beginPath();
+      g.moveTo(cx2 + sx * size, cy2);
+      g.lineTo(cx2, cy2);
+      g.lineTo(cx2, cy2 + sy * size);
+      g.strokePath();
+    });
   }
 
   // all scrollable objects live inside scrollContainer.
@@ -171,6 +210,9 @@ export class ProfileDetailScene extends Phaser.Scene {
     this.scrollContainer = this.add.container(0, 0).setDepth(3);
 
     let y = this.panelY + DETAIL_LAYOUT.topPad;
+
+    y = this.addTerminalHeader(cx, y, contentWidth);
+    y += 12;
 
     y = this.addProfileImage(cx, y, contentWidth);
     y += DETAIL_LAYOUT.sectionGap;
@@ -210,6 +252,51 @@ export class ProfileDetailScene extends Phaser.Scene {
     this.scrollMax = Math.min(0, visiblePanelH - contentH);
   }
 
+  addTerminalHeader(cx, y, contentWidth) {
+    const bar = this.add
+      .rectangle(cx, y + 14, contentWidth, 28, 0x003311, 1)
+      .setOrigin(0.5, 0);
+    this.scrollContainer.add(bar);
+
+    const leftX = cx - contentWidth * 0.45;
+
+    const prefix = this.add.text(leftX, y + 6, ">> ACCESS GRANTED", {
+      fontSize:   "14px",
+      color:      "#00ff88",
+      fontStyle:  "bold",
+      fontFamily: DETAIL_STYLE.fontFamily,
+    }).setOrigin(0, 0);
+    this.scrollContainer.add(prefix);
+
+    this._cursorText = this.add.text(leftX + prefix.width + 6, y + 6, "\u2588", {
+      fontSize:   "14px",
+      color:      "#00ff88",
+      fontFamily: DETAIL_STYLE.fontFamily,
+    }).setOrigin(0, 0);
+    this.scrollContainer.add(this._cursorText);
+
+    this.tweens.add({
+      targets:  this._cursorText,
+      alpha:    0,
+      duration: 500,
+      ease:     "Power1",
+      yoyo:     true,
+      repeat:   -1,
+    });
+
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const ts  = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}  ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+    const tsText = this.add.text(cx + contentWidth * 0.45, y + 6, ts, {
+      fontSize:   "11px",
+      color:      "#336644",
+      fontFamily: DETAIL_STYLE.fontFamily,
+    }).setOrigin(1, 0);
+    this.scrollContainer.add(tsText);
+
+    return y + 28 + 4;
+  }
 
   // profile image with green accent border
   addProfileImage(cx, y, contentWidth) {
@@ -225,25 +312,71 @@ export class ProfileDetailScene extends Phaser.Scene {
 
     if (this.textures.exists(textureKey)) {
       const img = this.add.image(cx, imgCY, textureKey).setDisplaySize(imgW, imgH).setOrigin(0.5);
+      img.setTint(0xaaffcc);
       this.scrollContainer.add(img);
     } else {
       const ph = this.add.rectangle(cx, imgCY, imgW, imgH, DETAIL_STYLE.imageFallbackColor, 1).setOrigin(0.5);
       this.scrollContainer.add(ph);
     }
 
+    const scanBar = this.add.rectangle(cx, y, imgW, 4, 0x00ff88, 0.20).setOrigin(0.5, 0);
+    this.scrollContainer.add(scanBar);
+    const startY = y;
+    this.tweens.add({
+      targets:  scanBar,
+      y:        y + imgH,
+      duration: 2400,
+      ease:     "Linear",
+      repeat:   -1,
+      onRepeat: () => { scanBar.y = startY; },
+    });
+
+    this.addScrollCornerBrackets(cx - imgW / 2, y, imgW, imgH, 14, 2);
+
     return y + imgH;
+  }
+
+  addScrollCornerBrackets(x, y, w, h, size, thickness) {
+    const g = this.add.graphics();
+    g.lineStyle(thickness, 0x00ff88, 0.80);
+    const corners = [
+      [x,     y,      1,  1],
+      [x + w, y,     -1,  1],
+      [x,     y + h,  1, -1],
+      [x + w, y + h, -1, -1],
+    ];
+    corners.forEach(([cx2, cy2, sx, sy]) => {
+      g.beginPath();
+      g.moveTo(cx2 + sx * size, cy2);
+      g.lineTo(cx2, cy2);
+      g.lineTo(cx2, cy2 + sy * size);
+      g.strokePath();
+    });
+    this.scrollContainer.add(g);
   }
 
   // name in large bold white text
   addNameText(cx, y) {
-    const text = this.add.text(cx, y, this.currentProfile.name || "Unknown", {
-      fontSize:   DETAIL_STYLE.nameFontSize,
-      color:      DETAIL_STYLE.nameColor,
-      fontStyle:  "bold",
-      fontFamily: DETAIL_STYLE.fontFamily,
+    const text = this.add.text(cx, y, (this.currentProfile.name || "Unknown").toUpperCase(), {
+      fontSize:      DETAIL_STYLE.nameFontSize,
+      color:         DETAIL_STYLE.nameColor,
+      fontStyle:     "bold",
+      fontFamily:    DETAIL_STYLE.fontFamily,
+      letterSpacing: 4,
     }).setOrigin(0.5, 0);
     this.scrollContainer.add(text);
-    return y + text.height;
+
+    const ny = y + text.height + 4;
+    const idLine = this.add.text(cx,
+      ny,
+      `SUBJECT_ID: ${String(this.currentProfile.id).padStart(4, "0")}  //  CLEARANCE: LEVEL-5`, {
+        fontSize:   "12px",
+        color:      "#336644",
+        fontFamily: DETAIL_STYLE.fontFamily,
+      }).setOrigin(0.5, 0);
+    this.scrollContainer.add(idLine);
+
+    return ny + idLine.height;
   }
 
   // thin 1px horizontal divider
@@ -268,13 +401,13 @@ export class ProfileDetailScene extends Phaser.Scene {
     return y + text.height;
   }
 
-  // bio text + structured key/value rows
+  // Strcutured key value rows
   addGeneralInfo(cx, y, contentWidth) {
     const profile = this.currentProfile;
 
-    const bioText = this.add.text(cx, y, profile.text || "No additional information available.", {
-      fontSize:    "13px",
-      color:       "#aaaaaa",
+    const bioText = this.add.text(cx, y, `"${profile.text || "No additional information available."}"`, {
+      fontSize:    "14px",
+      color:       "#558855",
       align:       "center",
       wordWrap:    { width: contentWidth * 0.88, useAdvancedWrap: true },
       lineSpacing: 3,
@@ -316,6 +449,10 @@ export class ProfileDetailScene extends Phaser.Scene {
     y = this.addSSNGraphic(cx, y, contentWidth);
     y += DETAIL_LAYOUT.assetGap;
 
+    // Intial configurations
+    // will be replaced with the information from the JSON file as provided
+
+    // Same for above too
     const ssn = this.currentProfile.ssn || {};
     const rows = [
       ["SSN",    ssn.number || "•••-••-••••"],
@@ -324,13 +461,21 @@ export class ProfileDetailScene extends Phaser.Scene {
     ];
     y = this.addInfoRows(cx, y, contentWidth, rows);
 
-    const warning = this.add.text(cx, y + 4, "CONFIDENTIAL — HANDLE WITH CARE", {
-      fontSize:   "10px",
+    const warning = this.add.text(cx, y + 4, "⚠  CONFIDENTIAL — HANDLE WITH CARE  ⚠", {
+      fontSize:   "16px",
       color:      "#ff4444",
       fontStyle:  "bold",
       fontFamily: DETAIL_STYLE.fontFamily,
     }).setOrigin(0.5, 0);
     this.scrollContainer.add(warning);
+    this.tweens.add({
+      targets:  warning,
+      alpha:    0.25,
+      duration: 900,
+      ease:     "Sine.easeInOut",
+      yoyo:     true,
+      repeat:   -1,
+    });
     return y + warning.height + 8;
   }
 
@@ -342,7 +487,9 @@ export class ProfileDetailScene extends Phaser.Scene {
     const img = this.add.image(cx, y + cardH / 2, "creditCardAsset")
       .setDisplaySize(cardW, cardH)
       .setOrigin(0.5);
+    img.setTint(0xaaffcc);
     this.scrollContainer.add(img);
+    this.addScrollCornerBrackets(cx - cardW / 2, y, cardW, cardH, 10, 1);
 
     return y + cardH;
   }
@@ -355,7 +502,9 @@ export class ProfileDetailScene extends Phaser.Scene {
     const img = this.add.image(cx, y + cardH / 2, "ssnAsset")
       .setDisplaySize(cardW, cardH)
       .setOrigin(0.5);
+    img.setTint(0xaaffcc);
     this.scrollContainer.add(img);
+    this.addScrollCornerBrackets(cx - cardW / 2, y, cardW, cardH, 10, 1);
 
     return y + cardH;
   }
@@ -411,30 +560,40 @@ export class ProfileDetailScene extends Phaser.Scene {
 
     // Kill (red)
     this.createButton(cx - btnW / 2 - 8, btnY, btnW, btnH,
-      "TERMINATE", 0xcc0000, 0xff3333, () => this.handleKill());
+      "TERMINATE", 0x1a0000, 0xff0000, 0x440000, () => this.handleKill());
 
     // Start Dating (green)
     this.createButton(cx + btnW / 2 + 8, btnY, btnW, btnH,
-      "START DATING", 0x007744, 0x00ff88, () => this.handleStartDating());
+      "START DATING", 0x001a08, 0x00ff88, 0x003311, () => this.handleStartDating());
   }
 
   // build one button: bg rect + label text at depth 10/11
-  createButton(x, y, w, h, label, baseColor, hoverColor, callback) {
+  createButton(x, y, w, h, label, baseColor, glowColor, hoverColor, callback) {
+    const glowHex = `#${glowColor.toString(16).padStart(6, "0")}`;
+
     const bg = this.add.rectangle(x, y, w, h, baseColor)
       .setOrigin(0.5)
       .setDepth(10)
       .setInteractive({ useHandCursor: true });
-    bg.setStrokeStyle(1.5, 0xffffff, 0.6);
+    bg.setStrokeStyle(1.5, glowColor, 0.9);
 
     const txt = this.add.text(x, y, label, {
       fontSize:   DETAIL_STYLE.btnFontSize,
-      color:      DETAIL_STYLE.btnTextColor,
+      color:      glowHex,
       fontStyle:  "bold",
       fontFamily: DETAIL_STYLE.fontFamily,
     }).setOrigin(0.5).setDepth(11);
 
-    bg.on("pointerover", () => { bg.setFillStyle(hoverColor); txt.setScale(1.05); });
-    bg.on("pointerout",  () => { bg.setFillStyle(baseColor);  txt.setScale(1); });
+    bg.on("pointerover", () => {
+      bg.setFillStyle(hoverColor);
+      bg.setStrokeStyle(2, glowColor, 1);
+      txt.setScale(1.05);
+    });
+    bg.on("pointerout",  () => {
+      bg.setFillStyle(baseColor);
+      bg.setStrokeStyle(1.5, glowColor, 0.9);
+      txt.setScale(1);
+    });
 
     bg.on("pointerdown", () => {
       if (this._buttonLocked) return;
@@ -450,6 +609,20 @@ export class ProfileDetailScene extends Phaser.Scene {
     });
   }
 
+  playEntryGlitch() {
+    const { width, height } = this.cameras.main;
+    this.cameras.main.shake(200, 0.008);
+    [0.40, 0.22, 0.10].forEach((alpha, i) => {
+      this.time.delayedCall(i * 75, () => {
+        const f = this.add.rectangle(width / 2, height / 2, width, height, 0x00ff88, alpha)
+          .setDepth(200);
+        this.tweens.add({
+          targets: f, alpha: 0, duration: 120, ease: "Power2",
+          onComplete: () => f.destroy(),
+        });
+      });
+    });
+  }
 
   handleKill() {
     if (this.currentProfile) GameState.recordKill(this.currentProfile.id);
@@ -467,15 +640,32 @@ export class ProfileDetailScene extends Phaser.Scene {
     return new Promise((resolve) => {
       const { width, height } = this.cameras.main;
 
+      this.cameras.main.shake(280, 0.016);
+
       const flash = this.add.rectangle(width / 2, height / 2, width, height, 0xff0000, 0.6)
         .setOrigin(0.5).setDepth(1000);
+
+      const noise = this.add.graphics().setDepth(1001);
+      for (let i = 0; i < 70; i++) {
+        noise.fillStyle(0xffffff, Math.random() * 0.35);
+        noise.fillRect(
+          Math.random() * width, Math.random() * height,
+          Math.random() * 38 + 2, Math.random() * 3 + 1
+        );
+      }
 
       const eliminatedText = this.add.text(width / 2, height / 2, "TARGET ELIMINATED", {
         fontSize: "48px", color: "#ff0000", fontStyle: "bold",
         stroke: "#000000", strokeThickness: 6,
-      }).setOrigin(0.5).setDepth(1001).setScale(0);
+        fontFamily: DETAIL_STYLE.fontFamily,
+        letterSpacing: 6,
+      }).setOrigin(0.5).setDepth(1002).setScale(0);
 
       this.tweens.add({ targets: flash, alpha: 0, duration: 600, ease: "Power2" });
+      this.tweens.add({
+        targets: noise, alpha: 0, duration: 380, ease: "Power2",
+        onComplete: () => noise.destroy(),
+      });
 
       this.tweens.add({
         targets: eliminatedText, scale: 1, duration: 300, ease: "Back.out",
@@ -505,16 +695,30 @@ export class ProfileDetailScene extends Phaser.Scene {
     return new Promise((resolve) => {
       const { width, height } = this.cameras.main;
 
-      for (let i = 0; i < 20; i++) {
+      const flash = this.add.rectangle(width / 2, height / 2, width, height, 0x00ff88, 0.14)
+        .setOrigin(0.5).setDepth(999);
+      this.tweens.add({
+        targets: flash, alpha: 0, duration: 600, ease: "Power2",
+        onComplete: () => flash.destroy(),
+      });
+
+      for (let i = 0; i < 24; i++) {
         const heart = this.add.text(
-          width / 2 + Phaser.Math.Between(-100, 100),
+          width / 2 + Phaser.Math.Between(-130, 130),
           height / 2 + Phaser.Math.Between(-100, 100),
-          "♥", { fontSize: `${Phaser.Math.Between(20, 40)}px`, color: "#ff69b4" }
+          "♥", {
+            fontSize: `${Phaser.Math.Between(20, 40)}px`,
+            color: "#ff69b4",
+          }
         ).setOrigin(0.5).setDepth(1000);
 
         this.tweens.add({
-          targets: heart, y: heart.y - 150, alpha: 0, scale: 0,
-          duration: Phaser.Math.Between(800, 1500), ease: "Power2",
+          targets: heart,
+          y: heart.y - Phaser.Math.Between(100, 200),
+          alpha: 0, scale: 0,
+          duration: Phaser.Math.Between(800, 1500),
+          delay: Phaser.Math.Between(0, 300),
+          ease: "Power2",
           onComplete: () => heart.destroy(),
         });
       }
@@ -522,6 +726,8 @@ export class ProfileDetailScene extends Phaser.Scene {
       const matchText = this.add.text(width / 2, height / 2, "MATCH!", {
         fontSize: "56px", color: "#ff69b4", fontStyle: "bold",
         stroke: "#ffffff", strokeThickness: 4,
+        fontFamily: DETAIL_STYLE.fontFamily,
+        letterSpacing: 6,
       }).setOrigin(0.5).setDepth(1001).setScale(0);
 
       this.tweens.add({
@@ -539,7 +745,7 @@ export class ProfileDetailScene extends Phaser.Scene {
 
 
   bindInput() {
-    const DRAG_THRESHOLD = 8; // px a pointer must move before scroll activates
+    const DRAG_THRESHOLD = 8;
 
     // only begin tracking scroll when the pointer lands INSIDE the panel.
     this._ptrDownHandler = (ptr) => {
@@ -551,7 +757,7 @@ export class ProfileDetailScene extends Phaser.Scene {
       this.scrollStartY  = this.scrollY;
     };
 
-    // only scroll when isPointerDown is true (set only after a valid in-panel pointerdown).
+    // only scroll when isPointerDown is true
     this._ptrMoveHandler = (ptr) => {
       if (!this.isPointerDown) return;
       const delta = ptr.y - this.dragStartY;
