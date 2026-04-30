@@ -142,43 +142,45 @@ export const LOADER_CONFIG = Object.freeze({
 });
 
 
-// ─── ProfileDetailScene constants ────────────────────────────────────────────
+// Profile Details Configurations
+
 // All visual styling for ProfileDetailScene lives here so tuning is one-file.
 // Separated from the card constants above to keep each section self-contained.
 
 // colors, fonts, and text sizing for the detail panel.
+// hacker terminal kind of aesthetic
 export const DETAIL_STYLE = Object.freeze({
-  bgColor:               0x0a0a0a,  // near-black fullscreen backdrop
-  panelBgColor:          0x111418,  // slightly lighter panel fill
-  panelBorderColor:      0x00ff88,  // green accent border
+  bgColor:               0x000000,  // pure black fullscreen backdrop
+  panelBgColor:          0x050d08,  // very dark green-tinted panel fill
+  panelBorderColor:      0x00ff88,  // bright green accent border
   panelBorderWidth:      2,         // border stroke thickness in px
 
-  fontFamily:            "Courier New, monospace", // consistent monospace theme
+  fontFamily:            "Courier New, monospace", // monospace entirely
 
   nameFontSize:          "26px",
-  nameColor:             "#ffffff",
+  nameColor:             "#00ff88", // green name text
 
-  sectionHeaderFontSize: "11px",
-  sectionHeaderColor:    "#00ff88",  // green to match border
+  sectionHeaderFontSize: "16px",
+  sectionHeaderColor:    "#00aa55", // dimmer green for section labels
 
-  infoKeyFontSize:       "12px",
-  infoKeyColor:          "#888888",  // muted label color
-  infoValFontSize:       "12px",
-  infoValColor:          "#dddddd",  // bright value color
+  infoKeyFontSize:       "15px",
+  infoKeyColor:          "#00cc66", // bright green for key labels
+  infoValFontSize:       "15px",
+  infoValColor:          "#aaffcc", // lighter green for values
 
-  dividerColor:          0x444444,   // thin separator line
+  dividerColor:          0x00ff88,  // green separator line
 
-  imageFallbackColor:    0x222222,   // dark gray when profile texture is missing
+  imageFallbackColor:    0x001a0a,  // very dark green when profile texture is missing
 
-  btnFontSize:           "12px",
+  btnFontSize:           "14px",
   btnTextColor:          "#ffffff",
 });
 
-// layout geometry and spacing for the detail panel.
+// layout geometry and spacing for the detail panel
 export const DETAIL_LAYOUT = Object.freeze({
   panelWidthPct:       0.92,   // panel width as fraction of camera width
   panelHeightPct:      0.88,   // panel height as fraction of camera height
-  maxContentWidth:     520,    // max content width in px (caps wide-screen stretch)
+  maxContentWidth:     520,    // max content width in px
 
   topPad:              16,     // gap between panel top and first content item
   bottomPad:           16,     // gap below last content item (before button bar)
@@ -187,16 +189,16 @@ export const DETAIL_LAYOUT = Object.freeze({
   assetGap:            10,     // gap between an asset graphic and its info rows
   infoRowHeight:       22,     // base row height used for row spacing math
 
-  profileImageHeight:  200,    // profile photo height in px
+  profileImageHeight:  300,    // profile photo height
 
   // credit card asset sizing
-  ccWidthRatio:        0.90,   // card width as fraction of contentWidth
-  ccAspectRatio:       0.63,   // card height = cardWidth * this ratio (standard card ~1.586:1 inverted)
+  ccWidthRatio:        0.90,   
+  ccAspectRatio:       0.60,   
 
   // ssn card asset sizing
-  ssnWidthRatio:       0.85,
-  ssnAspectRatio:      0.50,
+  ssnWidthRatio:       0.90,
+  ssnAspectRatio:      0.70,
 
-  buttonHeight:        44,     // pinned button bar height in px
-  wheelScrollSpeed:    0.4,    // fraction of wheel deltaY applied per scroll event
+  buttonHeight:        44,     
+  wheelScrollSpeed:    0.4,   
 });
