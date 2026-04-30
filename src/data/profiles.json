@@ -1,29 +1,135 @@
 {
-  "version": 1,
+  "version": 2,
   "profiles": [
     {
       "id": 1,
       "name": "Soldier",
-      "text": "umm you get the vibes.",
-      "imagePath": "assets/profiles/soldier.jpg"
+      "text": "I've seen some things... Looking for some fun after the war :0",
+      "imagePath": "assets/profiles/soldier.jpg",
+      "info": {
+        "age": "41",
+        "occupation": "Fighting in da war",
+        "location": "The Trenches",
+        "height": "6'7",
+        "status": "Alive…somehow"
+      },
+      "creditCard": {
+        "number": "6767 6767 6767 6767",
+        "holder": "Soldier",
+        "expiry": "06/70",
+        "cvv": "067",
+        "bank": "Bank of War",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "677-67-6767",
+        "issued": "67/67/6767",
+        "state": "Trenches"
+      }
     },
     {
       "id": 2,
-      "name": "Clown",
-      "text": "chaotic energy, the disgusts of the clown.",
-      "imagePath": "assets/profiles/clown.jpg"
+      "name": "Nayanika",
+      "text": "Life is a gamble. Send me money!!",
+      "imagePath": "assets/profiles/Nayanika Tinder.png",
+      "info": {
+        "age": "20",
+        "occupation": "Lip Gloss Tester",
+        "location": "The Lip Gloss Labs",
+        "height": "8'88",
+        "status": "10 Lip Glosses in"
+      },
+      "creditCard": {
+        "number": "8888 8888 8888 8888",
+        "holder": "Nayanika",
+        "expiry": "88/88",
+        "cvv": "888",
+        "bank": "Lip Gloss Credit Union",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "888-88-8888",
+        "issued": "88/88/8888",
+        "state": "Lip Gloss Lab"
+      }
     },
     {
       "id": 3,
-      "name": "Surrender",
-      "text": "paws up and no resistance, acceptance and pure harmless chaos.",
-      "imagePath": "assets/profiles/surrender.jpg"
+      "name": "Efe",
+      "text": "Cat dad, S.T.A.L.K.E.R enthusiast, game design nerd!",
+      "imagePath": "assets/profiles/Efe Tinder.png",
+      "info": {
+        "age": "21",
+        "occupation": "Full-Time Cat Dad",
+        "location": "Home with his cats",
+        "height": "3'7",
+        "status": "I can't climb"
+      },
+      "creditCard": {
+        "number": "3737 3737 3737 3737",
+        "holder": "Efe",
+        "expiry": "37/37",
+        "cvv": "373",
+        "bank": "Shadow",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "373-37-3737",
+        "issued": "37/37/3737",
+        "state": "Shadow Nation"
+      }
     },
     {
       "id": 4,
-      "name": "Cat",
-      "text": "elegant, mysterious, and an absolute gentleman.",
-      "imagePath": "assets/profiles/cat.jpg"
+      "name": "Altice",
+      "text": "Teaching Professor, Computational Media, I loveeeee Marvel Snap",
+      "imagePath": "assets/profiles/Altice Tinder.png",
+      "info": {
+        "age": "25",
+        "occupation": "Professional Marvel Snap Player",
+        "location": "In front of my iPhone, playing Marvel Snap",
+        "height": "8",
+        "status": "Marvel Snap :0"
+      },
+      "creditCard": {
+        "number": "8888 8888 8888 8888",
+        "holder": "Nathan",
+        "expiry": "88/88",
+        "cvv": "888",
+        "bank": "Snap",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "888-88-8888",
+        "issued": "88/88/8888",
+        "state": "Marvel Snap Nation"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Melissa",
+      "text": "Horse enthusiast, gatcha enjoyer, I play too much league -_-",
+      "imagePath": "assets/profiles/Melissa Tinder.png",
+      "info": {
+        "age": "21",
+        "occupation": "Gambler",
+        "location": "The Casinos",
+        "height": "2'1",
+        "status": "Hitting the casinos on a horse"
+      },
+      "creditCard": {
+        "number": "2121 2121 2121 2121",
+        "holder": "Melissa",
+        "expiry": "21/21",
+        "cvv": "212",
+        "bank": "Broke",
+        "type": "Visa"
+      },
+      "ssn": {
+        "number": "212-21-2121",
+        "issued": "21/21/2121",
+        "state": "CASINOOOOOOOOo"
+      }
     }
   ]
 }
