@@ -140,3 +140,63 @@ export const LOADER_CONFIG = Object.freeze({
   initialBatchSize: 3, // how many profile images to load before first render
   backgroundDelayMs: 200, // delay before idle-time background loading begins
 });
+
+
+// ─── ProfileDetailScene constants ────────────────────────────────────────────
+// All visual styling for ProfileDetailScene lives here so tuning is one-file.
+// Separated from the card constants above to keep each section self-contained.
+
+// colors, fonts, and text sizing for the detail panel.
+export const DETAIL_STYLE = Object.freeze({
+  bgColor:               0x0a0a0a,  // near-black fullscreen backdrop
+  panelBgColor:          0x111418,  // slightly lighter panel fill
+  panelBorderColor:      0x00ff88,  // green accent border
+  panelBorderWidth:      2,         // border stroke thickness in px
+
+  fontFamily:            "Courier New, monospace", // consistent monospace theme
+
+  nameFontSize:          "26px",
+  nameColor:             "#ffffff",
+
+  sectionHeaderFontSize: "11px",
+  sectionHeaderColor:    "#00ff88",  // green to match border
+
+  infoKeyFontSize:       "12px",
+  infoKeyColor:          "#888888",  // muted label color
+  infoValFontSize:       "12px",
+  infoValColor:          "#dddddd",  // bright value color
+
+  dividerColor:          0x444444,   // thin separator line
+
+  imageFallbackColor:    0x222222,   // dark gray when profile texture is missing
+
+  btnFontSize:           "12px",
+  btnTextColor:          "#ffffff",
+});
+
+// layout geometry and spacing for the detail panel.
+export const DETAIL_LAYOUT = Object.freeze({
+  panelWidthPct:       0.92,   // panel width as fraction of camera width
+  panelHeightPct:      0.88,   // panel height as fraction of camera height
+  maxContentWidth:     520,    // max content width in px (caps wide-screen stretch)
+
+  topPad:              16,     // gap between panel top and first content item
+  bottomPad:           16,     // gap below last content item (before button bar)
+  sectionGap:          14,     // vertical gap between major sections
+  headerGap:           8,      // gap between a section header and its content
+  assetGap:            10,     // gap between an asset graphic and its info rows
+  infoRowHeight:       22,     // base row height used for row spacing math
+
+  profileImageHeight:  200,    // profile photo height in px
+
+  // credit card asset sizing
+  ccWidthRatio:        0.90,   // card width as fraction of contentWidth
+  ccAspectRatio:       0.63,   // card height = cardWidth * this ratio (standard card ~1.586:1 inverted)
+
+  // ssn card asset sizing
+  ssnWidthRatio:       0.85,
+  ssnAspectRatio:      0.50,
+
+  buttonHeight:        44,     // pinned button bar height in px
+  wheelScrollSpeed:    0.4,    // fraction of wheel deltaY applied per scroll event
+});
