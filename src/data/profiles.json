@@ -1,29 +1,35 @@
 {
-  "version": 1,
+  "version": 2,
   "profiles": [
     {
       "id": 1,
       "name": "Soldier",
-      "text": "umm you get the vibes.",
-      "imagePath": "assets/profiles/soldier.jpg"
+      "text": "",
+      "imagePath": "assets/profiles/Soilder Tinder.png"
     },
     {
       "id": 2,
-      "name": "Clown",
-      "text": "chaotic energy, the disgusts of the clown.",
-      "imagePath": "assets/profiles/clown.jpg"
+      "name": "Altice",
+      "text": "",
+      "imagePath": "assets/profiles/Altice Tinder.png"
     },
     {
       "id": 3,
-      "name": "Surrender",
-      "text": "paws up and no resistance, acceptance and pure harmless chaos.",
-      "imagePath": "assets/profiles/surrender.jpg"
+      "name": "Efe",
+      "text": "",
+      "imagePath": "assets/profiles/Efe Tinder.png"
     },
     {
       "id": 4,
-      "name": "Cat",
-      "text": "elegant, mysterious, and an absolute gentleman.",
-      "imagePath": "assets/profiles/cat.jpg"
+      "name": "Melissa",
+      "text": "",
+      "imagePath": "assets/profiles/Melissa Tinder.png"
+    },
+    {
+      "id": 5,
+      "name": "Nayanika",
+      "text": "",
+      "imagePath": "assets/profiles/Nayanika Tinder.png"
     }
   ]
 }

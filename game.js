@@ -1,6 +1,8 @@
 import { TitleScreenScene } from "./src/scenes/TitleScreen.js";
 import { SwipeDeckScene } from "./src/scenes/SwipeDeckScene.js";
 import { StalkingScene } from "./src/scenes/StalkingScene.js";
+import { StorageScene } from "./src/scenes/StorageScene.js";
+
 const { Phaser } = window;
 
 // global game boot settings live here so scene files stay focused on gameplay
@@ -19,7 +21,7 @@ const gameConfig = {
     windowEvents: true,
     touch: { capture: true },
   },
-  scene: [TitleScreenScene, SwipeDeckScene, StalkingScene],
+  scene: [TitleScreenScene, SwipeDeckScene, StorageScene, StalkingScene],
 };
 
 if (!Phaser) {
