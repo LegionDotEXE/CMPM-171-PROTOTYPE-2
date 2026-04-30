@@ -5,9 +5,19 @@
 // the inner target holds the live set and safe helper methods.
 // helpers are defined on the target so the proxy allows calling them,
 // while the set trap still guards raw assignments against bad data.
+
 const target = {
   // hackedIds uses a Set so adds are o(1) and duplicates are impossible.
   hackedIds: new Set(),
+
+  // killedIds: profiles the player terminated via the detail scene.
+  killedIds: new Set(),
+
+  // matchedIds: profiles the player chose to start dating.
+  matchedIds: new Set(),
+
+  // lastHackedProfile: the full profile object from the most recent hack commit.
+  _lastHackedProfile: null,
 
   // record one profile id into the hacked list.
   // input is any id-like value. non-numeric input is ignored so the
@@ -16,6 +26,32 @@ const target = {
     const numericId = Number(profileId);
     if (!Number.isFinite(numericId)) return;
     this.hackedIds.add(numericId);
+  },
+
+  // store the full profile object so ProfileDetailScene can retrieve it.
+  // called alongside recordHack so the two are always in sync.
+  setLastHackedProfile(profile) {
+    if (!profile || typeof profile !== "object") return;
+    this._lastHackedProfile = profile;
+  },
+
+  // return the last-hacked profile object (or null if none yet).
+  getLastHackedProfile() {
+    return this._lastHackedProfile;
+  },
+
+  // record a kill decision from the detail scene.
+  recordKill(profileId) {
+    const numericId = Number(profileId);
+    if (!Number.isFinite(numericId)) return;
+    this.killedIds.add(numericId);
+  },
+
+  // record a dating match decision from the detail scene.
+  recordMatch(profileId) {
+    const numericId = Number(profileId);
+    if (!Number.isFinite(numericId)) return;
+    this.matchedIds.add(numericId);
   },
 
   // return a plain array snapshot of hacked ids.
@@ -28,6 +64,7 @@ const target = {
   // keeps the session quick to re-test without page reload.
   clearHacks() {
     this.hackedIds.clear();
+    this._lastHackedProfile = null;
   },
 };
 
