@@ -13,8 +13,12 @@ import { CARD_CONFIG, LAYOUT_CONFIG, LOADER_CONFIG, SCENE_CONFIG } from "../cons
 //   create   -> read profiles, compute bounds, kick off progressive load
 //   (ready)  -> build active+pending stack, create effects/logic, bind input
 //   commit   -> SwipeLogic.executeCommit -> scene.promote -> next card
+//   hack     -> onHackCommit stores profile, onHackAnimationComplete pauses
+//               this scene and launches ProfileDetailScene; 
+//                SwipeDeckScene resumes when the detail scene stops
 //   resize   -> ProfileCard.applyLayout on every live card
 //   shutdown -> cleanup() detaches every listener we created
+
 export class SwipeDeckScene extends Phaser.Scene {
   constructor() {
     super({ key: "SwipeDeck" });
@@ -157,8 +161,10 @@ export class SwipeDeckScene extends Phaser.Scene {
       {
         getActive: () => this.activeCard,
         promote: () => this.promote(),
-        onHackCommit: (profileId) => this.onHackCommit(profileId),
-        onHackComplete: (profile) => this.launchHackMinigame(profile),
+        // onHackCommit: store id + full profile in GameState before the overlay plays.
+        onHackCommit: (profileId, profile) => this.onHackCommit(profileId, profile),
+        // onHackAnimationComplete: called after binary rain finishes, before promote().
+        onHackAnimationComplete: (profile) => this.onHackAnimationComplete(profile),
       },
       {
         threshold: SCENE_CONFIG.swipeThreshold,
@@ -213,17 +219,19 @@ export class SwipeDeckScene extends Phaser.Scene {
     });
   }
 
-  // hack-commit hook. writes id into global GameState and fires a
-  // window CustomEvent so other scenes/UI can subscribe without importing.
-  onHackCommit(profileId) {
+  // hack-commit hook. writes id + profile into global GameState so it
+  // survives scene transitions. fires a window CustomEvent for any
+  // external subscribers that don't import GameState directly.
+  onHackCommit(profileId, profile) {
     GameState.recordHack(profileId);
+    // store the full profile object so ProfileDetailScene can retrieve it
+    GameState.setLastHackedProfile(profile);
     window.dispatchEvent(
       new CustomEvent("hack-commit", {
         detail: { profileId, hackedIds: GameState.getHackedIDs() },
       })
     );
   }
-
   // =====================================================================
   // MINIGAME REDIRECT HOOK - EDIT THIS METHOD
   // =====================================================================
@@ -243,11 +251,21 @@ export class SwipeDeckScene extends Phaser.Scene {
   //
   // example:
   //   this.scene.start("YourMinigameKey", { profile });
-  //
   // leave this method empty to stay on the swipe deck (default behavior).
   // =====================================================================
-  launchHackMinigame(profile) {
+  
+  //launchHackMinigame(profile) {
     // intentionally empty - fill in with your redirect / minigame launch.
+
+  onHackAnimationComplete(profile) {
+    // pause this scene so its input handlers don't fire while detail is open.
+    this.scene.pause("SwipeDeck");
+    // launch ProfileDetailScene on top as an overlay. pass the full profile
+    // object so the detail scene doesn't need to look it up from GameState.
+    this.scene.launch("ProfileDetail", { profile });
+    // resolve immediately – promote() will run after this returns, which is fine
+    // because SwipeDeck is paused and the user won't see the stack change until resume.
+    return Promise.resolve();
   }
 
   // reflow every live card for a new viewport.
