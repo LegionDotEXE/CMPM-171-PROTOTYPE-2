@@ -100,6 +100,13 @@ export class ProfileDetailScene extends Phaser.Scene {
     if (!this.textures.exists("ssnAsset")) {
       this.load.image("ssnAsset", "assets/ssn_card.png");
     }
+    // kenny particle spritesheet: 2048x2048, 4x4 grid, 512x512 per frame.
+    // row 1 (frames 4-7) = debris/splatter clouds used for the blood burst.
+    if (!this.textures.exists("kennyParticles")) {
+      this.load.spritesheet("kennyParticles", "assets/kenny-particles-0.png", {
+        frameWidth: 512, frameHeight: 512,
+      });
+    }
   }
 
   create() {
@@ -401,7 +408,7 @@ export class ProfileDetailScene extends Phaser.Scene {
     return y + text.height;
   }
 
-  // Strcutured key value rows
+  // bio text + structured key/value rows
   addGeneralInfo(cx, y, contentWidth) {
     const profile = this.currentProfile;
 
@@ -449,10 +456,6 @@ export class ProfileDetailScene extends Phaser.Scene {
     y = this.addSSNGraphic(cx, y, contentWidth);
     y += DETAIL_LAYOUT.assetGap;
 
-    // Intial configurations
-    // will be replaced with the information from the JSON file as provided
-
-    // Same for above too
     const ssn = this.currentProfile.ssn || {};
     const rows = [
       ["SSN",    ssn.number || "•••-••-••••"],
@@ -462,7 +465,7 @@ export class ProfileDetailScene extends Phaser.Scene {
     y = this.addInfoRows(cx, y, contentWidth, rows);
 
     const warning = this.add.text(cx, y + 4, "⚠  CONFIDENTIAL — HANDLE WITH CARE  ⚠", {
-      fontSize:   "16px",
+      fontSize:   "12px",
       color:      "#ff4444",
       fontStyle:  "bold",
       fontFamily: DETAIL_STYLE.fontFamily,
@@ -635,48 +638,217 @@ export class ProfileDetailScene extends Phaser.Scene {
     });
   }
 
-  // red flash + "TARGET ELIMINATED" animation tween
+  // Diagnol Slash Animation - INspired from Fruit Ninja!?
+  // screen flash -> "TARGET ELIMINATED" text. 
+  // fully sequential via promises.
   createKillEffect() {
     return new Promise((resolve) => {
       const { width, height } = this.cameras.main;
 
-      this.cameras.main.shake(280, 0.016);
+      // draw the slash line across the screen diagonally
+      this.drawSlashLine(width, height).then(() => {
 
-      const flash = this.add.rectangle(width / 2, height / 2, width, height, 0xff0000, 0.6)
-        .setOrigin(0.5).setDepth(1000);
+        // blood burst at slash midpoint using kenny spritesheet frames
+        const midX = width  * 0.5;
+        const midY = height * 0.45;
+        this.spawnBloodBurst(midX, midY);
 
-      const noise = this.add.graphics().setDepth(1001);
-      for (let i = 0; i < 70; i++) {
-        noise.fillStyle(0xffffff, Math.random() * 0.35);
-        noise.fillRect(
-          Math.random() * width, Math.random() * height,
-          Math.random() * 38 + 2, Math.random() * 3 + 1
-        );
-      }
+        // camera shake + red flash together with the burst
+        this.cameras.main.shake(320, 0.022);
+        const flash = this.add.rectangle(width / 2, height / 2, width, height, 0xaa0000, 0.55)
+          .setOrigin(0.5).setDepth(1005);
+        this.tweens.add({ targets: flash, alpha: 0, duration: 500, ease: "Power2",
+          onComplete: () => flash.destroy() });
 
-      const eliminatedText = this.add.text(width / 2, height / 2, "TARGET ELIMINATED", {
-        fontSize: "48px", color: "#ff0000", fontStyle: "bold",
-        stroke: "#000000", strokeThickness: 6,
-        fontFamily: DETAIL_STYLE.fontFamily,
-        letterSpacing: 6,
-      }).setOrigin(0.5).setDepth(1002).setScale(0);
+        // "TARGET ELIMINATED" text after a short burst delay
+        this.time.delayedCall(400, () => {
+          const eliminatedText = this.add.text(width / 2, height / 2, "TARGET ELIMINATED", {
+            fontSize: "48px", color: "#ff0000", fontStyle: "bold",
+            stroke: "#000000", strokeThickness: 6,
+            fontFamily: DETAIL_STYLE.fontFamily,
+            letterSpacing: 6,
+          }).setOrigin(0.5).setDepth(1010).setScale(0);
 
-      this.tweens.add({ targets: flash, alpha: 0, duration: 600, ease: "Power2" });
-      this.tweens.add({
-        targets: noise, alpha: 0, duration: 380, ease: "Power2",
-        onComplete: () => noise.destroy(),
-      });
-
-      this.tweens.add({
-        targets: eliminatedText, scale: 1, duration: 300, ease: "Back.out",
-        onComplete: () => {
           this.tweens.add({
-            targets: eliminatedText, alpha: 0, scale: 1.5, duration: 400, ease: "Power2",
-            onComplete: resolve,
+            targets: eliminatedText, scale: 1, duration: 280, ease: "Back.out",
+            onComplete: () => {
+              this.tweens.add({
+                targets: eliminatedText, alpha: 0, scale: 1.5, duration: 420, ease: "Power2",
+                onComplete: resolve,
+              });
+            },
+          });
+        });
+      });
+    });
+  }
+
+  // draw a diagonal slash line from top-left area to bottom-right area
+  // use a growing graphics line to simulate the blade sweep.
+  // return a promise that resolves when the line finishes drawing.
+  drawSlashLine(width, height) {
+    return new Promise((resolve) => {
+      // slash goes from upper-left to lower-right at a maybe 40 degree angle
+      // That should do it
+      const x1 = width  * 0.15;
+      const y1 = height * 0.22;
+      const x2 = width  * 0.85;
+      const y2 = height * 0.78;
+
+      const g = this.add.graphics().setDepth(1003);
+
+      // we animate progress 0→1 via a tween on a plain object
+      const progress = { t: 0 };
+      this.tweens.add({
+        targets:  progress,
+        t:        1,
+        duration: 120,
+        ease:     "Sine.easeIn",
+        onUpdate: () => {
+          const t   = progress.t;
+          const cx  = x1 + (x2 - x1) * t;
+          const cy  = y1 + (y2 - y1) * t;
+
+          g.clear();
+
+          // outer glow
+          g.lineStyle(18, 0xff0000, 0.18);
+          g.beginPath(); g.moveTo(x1, y1); g.lineTo(cx, cy); g.strokePath();
+
+          // mid glow
+          g.lineStyle(7, 0xff2200, 0.55);
+          g.beginPath(); g.moveTo(x1, y1); g.lineTo(cx, cy); g.strokePath();
+
+          // core
+          g.lineStyle(2, 0xffffff, 0.95);
+          g.beginPath(); g.moveTo(x1, y1); g.lineTo(cx, cy); g.strokePath();
+        },
+        onComplete: () => {
+          // hold for one frame then fade the line out
+          this.tweens.add({
+            targets: g, alpha: 0, duration: 180, ease: "Power2",
+            onComplete: () => { g.destroy(); resolve(); },
           });
         },
       });
     });
+  }
+
+  // spawns a burst of blood-splatter sprites using kenny spritesheet frames 4-7
+  // each sprite gets a random velocity, rotation, scale, and fade duration.
+  spawnBloodBurst(cx, cy) {
+    // frames 4-7 are the debris cloud row 
+    const bloodFrames = [4, 5, 6, 7];
+
+    // movement tween uses Power1 so deceleration is gradual 
+    // alpha fade is made to be delayed so sprites stay fully visible through most of travel.
+    for (let i = 0; i < 28; i++) {
+      const frame  = bloodFrames[Math.floor(Math.random() * bloodFrames.length)];
+      const angle  = Math.random() * Math.PI * 2;
+      const speed  = 80 + Math.random() * 160;        
+      const scale  = 0.18 + Math.random() * 0.28;     
+      const vx     = Math.cos(angle) * speed;
+      const vy     = Math.sin(angle) * speed - 50;     // slight upward bias
+      const travel = 900 + Math.random() * 400;       
+      const fadeDelay = travel * 0.55;                
+
+      const spr = this.add.image(cx, cy, "kennyParticles", frame)
+        .setScale(scale)
+        .setTint(0xcc0000)
+        .setAlpha(0.95)
+        .setDepth(1004);
+
+      // movement
+      this.tweens.add({
+        targets:  spr,
+        x:        cx + vx * (travel / 1000),
+        y:        cy + vy * (travel / 1000) + 140,    // gravity drop
+        angle:    (Math.random() - 0.5) * 200,
+        duration: travel,
+        ease:     "Power1",
+      });
+
+      // delayed fade
+      this.time.delayedCall(fadeDelay, () => {
+        if (!spr.active) return;
+        this.tweens.add({
+          targets:  spr,
+          alpha:    0,
+          scaleX:   scale * 0.5,
+          scaleY:   scale * 0.5,
+          duration: travel - fadeDelay,
+          ease:     "Power2",
+          onComplete: () => spr.destroy(),
+        });
+      });
+    }
+
+    // large splat blobs, meat chuck, slices effect
+    for (let i = 0; i < 12; i++) {
+      const frame = bloodFrames[Math.floor(Math.random() * bloodFrames.length)];
+      const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.1; // upward fan
+      const speed = 50 + Math.random() * 110;         
+      const scale = 0.38 + Math.random() * 0.32;      
+      const vx    = Math.cos(angle) * speed;
+      const vy    = Math.sin(angle) * speed;
+      const life  = 1100 + Math.random() * 600;       
+      const fadeDelay = life * 0.60;                   // visible for 60% of life
+
+      const spr = this.add.image(cx, cy, "kennyParticles", frame)
+        .setScale(scale)
+        .setTint(0xaa0000)
+        .setAlpha(1)
+        .setDepth(1004);
+
+      this.tweens.add({
+        targets:  spr,
+        x:        cx + vx * (life / 1000),
+        y:        cy + vy * (life / 1000) + 260,       // gravity drop
+        angle:    (Math.random() - 0.5) * 140,
+        duration: life,
+        ease:     "Power1",
+      });
+
+      this.time.delayedCall(fadeDelay, () => {
+        if (!spr.active) return;
+        this.tweens.add({
+          targets:  spr,
+          alpha:    0,
+          duration: life - fadeDelay,
+          ease:     "Power2",
+          onComplete: () => spr.destroy(),
+        });
+      });
+    }
+
+    // slash-trail streak sprites along the cut line
+    for (let i = 0; i < 8; i++) {
+      const frame  = bloodFrames[Math.floor(Math.random() * bloodFrames.length)];
+      const t      = i / 7;
+      const sx     = this.cameras.main.width  * (0.15 + t * 0.70);
+      const sy     = this.cameras.main.height * (0.22 + t * 0.56);
+      const scale  = 0.28 + Math.random() * 0.18;     
+      const hold   = 320 + Math.random() * 180;        
+      const fade   = 500 + i * 60;                 
+
+      const spr = this.add.image(sx, sy, "kennyParticles", frame)
+        .setScale(scale)
+        .setTint(0xdd0000)
+        .setAlpha(0.92)
+        .setDepth(1003);
+
+      this.time.delayedCall(hold, () => {
+        if (!spr.active) return;
+        this.tweens.add({
+          targets:  spr,
+          alpha:    0,
+          y:        sy + 45,
+          duration: fade,
+          ease:     "Power2",
+          onComplete: () => spr.destroy(),
+        });
+      });
+    }
   }
 
   handleStartDating() {
