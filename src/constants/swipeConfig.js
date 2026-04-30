@@ -43,23 +43,9 @@ export const CARD_CONFIG = Object.freeze({
   fragmentTweenMs: 280, // slash animation duration
 });
 
-// per-card visual styling: colors, fonts, text positions.
-// these are "paint" numbers - they affect how a card LOOKS, not how it moves.
-// separated from CARD_CONFIG so designers can tweak look without touching physics.
+// per-card visual styling. with text baked into the PNG, this is now just
+// the grab tween + fallback color used when a texture hasn't loaded yet.
 export const CARD_STYLE = Object.freeze({
-  panelColor: 0xd90910, // bottom panel fill color (crimson red)
-  panelAlpha: 1, // bottom panel opacity
-  nameFontSize: "22px", // profile name font size
-  nameColor: "#ffffff", // profile name color
-  nameFontStyle: "bold", // profile name weight
-  descFontSize: "14px", // description font size
-  descColor: "#ffffff", // description color
-  descAlign: "center", // description alignment
-  wrapRatio: 0.88, // description wrap width as % of card width
-  imageYPct: -0.15, // y offset for image center (negative = above card center)
-  panelYPct: 0.35, // y offset for panel center (positive = below card center)
-  nameYPct: 0.3, // y offset for name text
-  descYPct: 0.4, // y offset for description text
   grabTweenMs: 110, // grab/release scale tween duration
   grabEase: "Sine.easeOut", // easing for the grab puff
   fallbackPanelColor: 0x333333, // neutral gray used if texture is missing
@@ -118,16 +104,15 @@ export const EFFECT_STYLE = Object.freeze({
 });
 
 // phone-frame layout: percentage-based so every screen fits the same feel.
-// card size is derived from camera dimensions * pct, clamped by min/max so
-// tiny or huge screens still look reasonable.
+// card size is derived from the DISPLAYED phone background (after fit-scaling),
+// not the raw camera. percentages match BACKGROUND_CONFIG.innerScreen* so the
+// card fully fills the phone's inner screen rectangle.
 export const LAYOUT_CONFIG = Object.freeze({
-  imageRatio: 0.7, // top 70% of the card is the profile image
-  textRatio: 0.3, // bottom 30% is the name/description panel
-  cardWidthPct: 0.85, // card width as fraction of camera width
-  cardHeightPct: 0.82, // card height as fraction of camera height
-  cardAspectTall: 1.5, // preferred height / width for a portrait card
-  cardMinWidth: 220, // never render cards narrower than this
-  cardMaxWidth: 520, // never render cards wider than this
+  cardWidthPct: 1.001, // card width as fraction of bg display width (matches inner screen)
+  cardHeightPct: 1.001, // card height as fraction of bg display height (matches inner screen)
+  cardAspectTall: 2.4, // loose enough that aspect never clamps fill height
+  cardMinWidth: 160, // never render cards narrower than this
+  cardMaxWidth: 700, // never render cards wider than this (clamps only on huge monitors)
   pendingOffsetY: 14, // pending card sits this far below active
   pendingDropStartY: -500, // pending "drops in" from this y after promotion
   pendingDropTweenMs: 400, // drop-in duration
@@ -139,4 +124,31 @@ export const LAYOUT_CONFIG = Object.freeze({
 export const LOADER_CONFIG = Object.freeze({
   initialBatchSize: 3, // how many profile images to load before first render
   backgroundDelayMs: 200, // delay before idle-time background loading begins
+});
+
+// shared phone-frame background asset (used by SwipeDeckScene + StorageScene).
+// the innerScreen* ratios describe the visible "screen" rectangle INSIDE the
+// phone art (the dark green window between the bezels). values are fractions
+// of the displayed bg size after fit-scaling. tweak these if you ship a new
+// bg PNG with a different inner-screen window.
+export const BACKGROUND_CONFIG = Object.freeze({
+  phoneTextureKey: "phoneBg", // phaser cache key for the blurred phone background
+  phoneImagePath: "assets/PhoneBackgroundBlurred.png",
+  depth: -10, // sit behind every gameplay element
+  innerScreenWidthPct: 0.74, // inner phone screen width as fraction of bg display width
+  innerScreenHeightPct: 0.74, // inner phone screen height as fraction of bg display height
+  innerScreenCenterYOffsetPct: 0.001, // bg center sits slightly below screen center (home button strip)
+});
+
+// storage scene grid + scroll tuning.
+// 3-column grid lives inside the phone's inner screen rectangle.
+// scrolling kicks in when the rows overflow the inner screen height.
+export const STORAGE_CONFIG = Object.freeze({
+  columns: 3, // grid column count (column = index % columns)
+  cellHeight: 130, // vertical spacing per row (cell = portrait + gap)
+  portraitWidth: 80, // displayed portrait width
+  portraitHeight: 110, // displayed portrait height
+  gridTopPad: 12, // breathing room from the top edge of the inner screen
+  headerHeight: 70, // reserved space at the top for back button + title
+  wheelStep: 0.6, // pixels of grid shift per wheel-delta unit
 });
