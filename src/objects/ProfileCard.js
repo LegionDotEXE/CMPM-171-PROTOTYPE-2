@@ -89,11 +89,21 @@ export class ProfileCard extends Phaser.GameObjects.Container {
   // build the card image (full bounds, centered at 0,0 inside the container).
   // if the texture is missing we fall back to a colored rectangle so the
   // card is never a broken white box.
+  
+  // buildImage(width, height) {
+  //   const textureKey = this.textureKey();
+  //   if (this.scene.textures.exists(textureKey)) {
+  //     const image = this.scene.add.image(0, 0, textureKey);
+  //     image.setDisplaySize(width, height);
+  //     return image;
+  //   }
+  //   return this.scene.add.rectangle(0, 0, width, height, CARD_STYLE.fallbackPanelColor, 1);
+  // }
   buildImage(width, height) {
     const textureKey = this.textureKey();
     if (this.scene.textures.exists(textureKey)) {
       const image = this.scene.add.image(0, 0, textureKey);
-      image.setDisplaySize(width, height);
+      image.setDisplaySize(width * 1.05, height * 1.001); 
       return image;
     }
     return this.scene.add.rectangle(0, 0, width, height, CARD_STYLE.fallbackPanelColor, 1);

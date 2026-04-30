@@ -110,7 +110,7 @@ export const EFFECT_STYLE = Object.freeze({
 export const LAYOUT_CONFIG = Object.freeze({
   cardWidthPct: 1.001, // card width as fraction of bg display width (matches inner screen)
   cardHeightPct: 1.001, // card height as fraction of bg display height (matches inner screen)
-  cardAspectTall: 2.4, // loose enough that aspect never clamps fill height
+  cardAspectTall: 2.7, // loose enough that aspect never clamps fill height
   cardMinWidth: 160, // never render cards narrower than this
   cardMaxWidth: 700, // never render cards wider than this (clamps only on huge monitors)
   pendingOffsetY: 14, // pending card sits this far below active
@@ -132,8 +132,8 @@ export const LOADER_CONFIG = Object.freeze({
 // of the displayed bg size after fit-scaling. tweak these if you ship a new
 // bg PNG with a different inner-screen window.
 export const BACKGROUND_CONFIG = Object.freeze({
-  phoneTextureKey: "phoneBg", // phaser cache key for the blurred phone background
-  phoneImagePath: "assets/PhoneBackgroundBlurred.png",
+  phoneTextureKey: "phoneBgII", // phaser cache key for the blurred phone background
+  phoneImagePath: "assets/profiles/Phone.png",
   depth: -10, // sit behind every gameplay element
   innerScreenWidthPct: 0.74, // inner phone screen width as fraction of bg display width
   innerScreenHeightPct: 0.74, // inner phone screen height as fraction of bg display height
