@@ -157,14 +157,12 @@ export const BACKGROUND_CONFIG = Object.freeze({
   innerScreenCenterYOffsetPct: 0.001, // bg center sits slightly above screen center
 });
 
-// storage scene grid + scroll tuning.
-// 3-column grid lives inside the phone's inner screen rectangle.
-// scrolling kicks in when the rows overflow the inner screen height.
+// Storage grid sizing and scroll tuning.
 export const STORAGE_CONFIG = Object.freeze({
   columns: 3, // grid column count (column = index % columns)
-  cellHeight: 130, // vertical spacing per row (cell = portrait + gap)
-  portraitWidth: 80, // displayed portrait width
-  portraitHeight: 110, // displayed portrait height
+  cellHeight: 158, // row spacing
+  portraitWidth: 104, // portrait width (larger tap target)
+  portraitHeight: 140, // portrait height (larger tap target)
   gridTopPad: 12, // breathing room from the top edge of the inner screen
   headerHeight: 70, // reserved space at the top for back button + title
   wheelStep: 0.6, // pixels of grid shift per wheel-delta unit

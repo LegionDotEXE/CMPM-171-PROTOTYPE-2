@@ -642,8 +642,7 @@ export class ProfileDetailScene extends Phaser.Scene {
       new CustomEvent("profile-killed", { detail: { profileId: this.currentProfile?.id } })
     );
     this.createKillEffect().then(() => {
-      this.scene.stop("ProfileDetail");
-      this.scene.resume("SwipeDeck");
+      this.scene.start("Storage");
     });
   }
 
