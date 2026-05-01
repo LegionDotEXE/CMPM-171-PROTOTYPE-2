@@ -33,7 +33,7 @@
  *   SwipeDeck is paused while this scene is active, and resumed on exit.
  *
  * Exit paths:
- *   "Kill"         → createKillEffect → GameState.recordKill →
+ *   "Terminate"         → createKillEffect → GameState.recordKill →
  *                    scene.stop("ProfileDetail") + scene.resume("SwipeDeck")
  *   "Start Dating" → createDatingEffect → GameState.recordMatch →
  *                    scene.stop("ProfileDetail") + scene.resume("SwipeDeck")
@@ -673,7 +673,7 @@ export class ProfileDetailScene extends Phaser.Scene {
             targets: eliminatedText, scale: 1, duration: 280, ease: "Back.out",
             onComplete: () => {
               this.tweens.add({
-                targets: eliminatedText, alpha: 0, scale: 1.5, duration: 420, ease: "Power2",
+                targets: eliminatedText, alpha: 0, scale: 1.5, duration: 420, delay: 600, ease: "Power2",
                 onComplete: resolve,
               });
             },
