@@ -4,26 +4,36 @@
  * image, the interactive hit area, and a "tap to open" hint label.
 */
 
+import { TITLE_BG_CONFIG, BACKGROUND_CONFIG } from "../constants/swipeConfig.js";
+
 export class TitleScreenScene extends Phaser.Scene {
     constructor() {
         super({ key: "TitleScreen" });
     }
 
     preload() {
-        this.load.image("phoneBg", "assets/PhoneBackgroundBlurred.png");
+        // blurred phone 
+        if (!this.textures.exists(TITLE_BG_CONFIG.textureKey)) {
+            this.load.image(TITLE_BG_CONFIG.textureKey, TITLE_BG_CONFIG.imagePath);
+        }
+        // Phone with white background
+        if (!this.textures.exists(BACKGROUND_CONFIG.phoneTextureKey)) {
+            this.load.image(BACKGROUND_CONFIG.phoneTextureKey, BACKGROUND_CONFIG.phoneImagePath);
+        }
     }
 
     create() {
         const { width, height } = this.scale;
 
+        // blurred phone fills the title screen
         this.bg = this.add
-        .image(width / 2, height / 2, "phoneBg")
+        .image(width / 2, height / 2, TITLE_BG_CONFIG.textureKey)
         .setDepth(0);
 
         const scaleX = width / this.bg.width;
         const scaleY = height / this.bg.height;
 
-        const scale = Math.min(scaleX, scaleY); 
+        const scale = Math.min(scaleX, scaleY);
 
         this.bg.setScale(scale);
 
