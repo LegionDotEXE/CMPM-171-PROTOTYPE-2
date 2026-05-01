@@ -1,3 +1,5 @@
+import { GameState } from "../systems/GameState.js";
+
 /* buildPositions calculates where each gear should be positioned relative
  * to each other based on edges between gears and which direction gears 
  * prefer to be placed. It returns a lookup of positions by gear id.
@@ -78,6 +80,14 @@ const ZONE_HIGH = 0.80;
 export class GearPuzzleScene extends Phaser.Scene {
   constructor() {
     super({key: 'GearPuzzleScene'});
+    this.flowData = null;
+  }
+
+  init(data) {
+    this.flowData = null;
+    if (data != null && typeof data === "object") {
+      this.flowData = data;
+    }
   }
 
   create() { // sets up background, shared graphics layers, UI text, buttons, and loads first puzzle
@@ -363,6 +373,29 @@ export class GearPuzzleScene extends Phaser.Scene {
     this._won = true;
     this._statusText.setText('bypass successful!').setColor('#1d9e75');
     this.cameras.main.flash(400, 29, 158, 117);
+
+    const isFinalBypass = this._puzzleIndex >= PUZZLES.length - 1;
+    if (!isFinalBypass) {
+      this.time.delayedCall(450, () => {
+        if (this.scene.isActive("GearPuzzleScene")) {
+          this._load(this._puzzleIndex + 1);
+        }
+      });
+      return;
+    }
+
+    this.time.delayedCall(500, () => {
+      let profile = null;
+      if (this.flowData != null && typeof this.flowData === "object") {
+        if (this.flowData.profile != null && typeof this.flowData.profile === "object") {
+          profile = this.flowData.profile;
+        }
+      }
+      if (profile == null) {
+        profile = GameState.getLastHackedProfile();
+      }
+      this.scene.start("ProfileDetail", { profile });
+    });
   }
 
   // simulaltes how rotation flows through the gear chain. gears can only pass rotation to neighbor if it is aligned. lock gear can receive rotation even if not aligned. smaller gears spin faster, larger spin slower. meshed gears spin in opposite directions. 

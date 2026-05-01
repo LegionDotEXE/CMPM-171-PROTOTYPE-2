@@ -6,18 +6,8 @@ import { PersistenceManager } from "../systems/PersistenceManager.js";
 import { GameState } from "../systems/GameState.js";
 import { BACKGROUND_CONFIG, CARD_CONFIG, LAYOUT_CONFIG, LOADER_CONFIG, SCENE_CONFIG } from "../constants/swipeConfig.js";
 
-// orchestrator scene. every piece of real gameplay logic lives in other
-// modules - this scene just wires them together and owns deck pointers.
-//
-// flow:
-//   preload  -> ProfileLoader.preloadJson
-//   create   -> paint background, read profiles, compute bounds, kick off progressive load
-//   (ready)  -> build active+pending stack, create effects/logic, bind input
-//   commit   -> SwipeLogic.executeCommit -> scene.promote -> next card
-//   hack     -> onHackCommit stores id, onHackAnimationComplete pauses scene
-//               and launches ProfileDetailScene; SwipeDeckScene resumes on exit.
-//   resize   -> ProfileCard.applyLayout on every live card
-//   shutdown -> cleanup() detaches every listener we created
+// Main swipe scene.
+// It keeps deck state and wires together input, effects, and scene transitions.
 export class SwipeDeckScene extends Phaser.Scene {
   constructor() {
     super({ key: "SwipeDeck" });
@@ -37,7 +27,8 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.backgroundImage = null; // phone bg behind cards (fit, never stretched)
     this.backgroundDisplayWidth = 0; // displayed bg width after fit-scaling
     this.backgroundDisplayHeight = 0; // displayed bg height after fit-scaling
-    this.collectionBtn = null; // top-left button that opens the StorageScene
+    this.collectionBtn = null; // top-left button that opens Storage
+    this.profileDatingHandler = null; // listens for "profile-dating" events
   }
 
   // preload: profiles json + the shared phone background. profile images are
@@ -93,35 +84,37 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.backgroundDisplayHeight = baseHeight * scale;
   }
 
-  // top-left "Collection" button that opens the StorageScene.
-  // sits outside the phone frame so it can't overlap a swipe.
+  // Top-left button to open Storage.
   setupCollectionButton() {
     this.collectionBtn = this.add
       .text(20, 20, "Collection", {
-        fontSize: "18px",
+        fontSize: "22px",
         color: "#ffffff",
         backgroundColor: "#222a",
-        padding: { x: 12, y: 8 },
+        padding: { x: 16, y: 10 },
       })
       .setDepth(100)
       .setInteractive({ useHandCursor: true });
-    // sleep+launch instead of start: keeps this deck frozen in memory so
-    // currentIndex / animation state / inputs all survive the round-trip
-    // through the storage screen.
+    // Keep the deck scene asleep in memory so it resumes where it left off.
     this.collectionBtn.on("pointerup", () => {
       this.scene.sleep("SwipeDeck");
       this.scene.launch("Storage");
     });
   }
 
-  // subscribe to the scene-level events we care about.
-  // kept in one method so cleanup() can mirror every binding exactly.
-  // wake refreshes layout in case the window was resized while we were
-  // sleeping behind the storage scene.
+  // Register scene and window listeners in one place so cleanup is easy.
   bindSceneLifecycle() {
     this.resizeHandler = () => this.handleResize();
     this.scale.on("resize", this.resizeHandler);
     this.events.on("wake", () => this.handleResize());
+    this.profileDatingHandler = () => {
+      // Green "Start Dating" button in ProfileDetail sends this event.
+      // We route that success path into the gear puzzle scene.
+      this.scene.stop("Storage");
+      this.scene.stop("ProfileDetail");
+      this.scene.start("GearPuzzleScene");
+    };
+    window.addEventListener("profile-dating", this.profileDatingHandler);
     this.events.once("shutdown", () => this.cleanup());
     this.events.once("destroy", () => this.cleanup());
   }
@@ -218,8 +211,7 @@ export class SwipeDeckScene extends Phaser.Scene {
     card.angle = 0;
   }
 
-  // build the SwipeLogic state machine with a small stack adapter.
-  // the adapter only exposes what logic needs (nothing more).
+  // Build SwipeLogic and pass only what it needs.
   setupLogic() {
     this.logic = new SwipeLogic(
       this,
@@ -227,17 +219,10 @@ export class SwipeDeckScene extends Phaser.Scene {
         getActive: () => this.activeCard,
         promote: async () => {
           await this.promote();
-          // after promotion, if both slots are now empty the deck is done
-          if (!this.activeCard && !this.pendingCard) {
-            this.onDeckExhausted();
-          }
+          // No deck-end bypass launch. Bypass now starts from Storage profile clicks.
         },
-        // onHackCommit: store id in both PersistenceManager (for StorageScene)
-        // and GameState (for ProfileDetailScene fallback).
+        // Keep hacked profile persistence.
         onHackCommit: (profileId, profile) => this.onHackCommit(profileId, profile),
-        // onHackAnimationComplete: fires after binary rain, before promote().
-        // pauses SwipeDeck and launches ProfileDetailScene as an overlay.
-        onHackAnimationComplete: (profile) => this.onHackAnimationComplete(profile),
       },
       {
         threshold: SCENE_CONFIG.swipeThreshold,
@@ -310,20 +295,9 @@ export class SwipeDeckScene extends Phaser.Scene {
     );
   }
 
-  // called by SwipeLogic after both the throw animation AND the binary rain
-  // have finished resolving. pauses SwipeDeck and launches ProfileDetailScene
-  // on top as an overlay. resolve immediately so promote() runs while paused
-  // (stack resets invisibly; user only sees SwipeDeck again after resuming).
-  onHackAnimationComplete(profile) {
-    this.scene.pause("SwipeDeck");
-    this.scene.launch("ProfileDetail", { profile });
-    return Promise.resolve();
-  }
-
-  // called when both activeCard and pendingCard are null after promotion.
-  // the entire deck has been swiped — hand off to the gear puzzle minigame.
+  // Deck-end now does nothing. Bypass is started from Storage.
   onDeckExhausted() {
-    this.scene.start("GearPuzzleScene");
+    return;
   }
 
   // reflow every live card + background for a new viewport.
@@ -365,6 +339,10 @@ export class SwipeDeckScene extends Phaser.Scene {
     if (this.collectionBtn) {
       this.collectionBtn.removeAllListeners();
       this.collectionBtn = null;
+    }
+    if (this.profileDatingHandler) {
+      window.removeEventListener("profile-dating", this.profileDatingHandler);
+      this.profileDatingHandler = null;
     }
     this.backgroundImage = null;
   }

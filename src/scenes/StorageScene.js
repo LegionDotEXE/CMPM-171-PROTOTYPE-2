@@ -2,16 +2,8 @@ import { ProfileLoader } from "../systems/ProfileLoader.js";
 import { PersistenceManager } from "../systems/PersistenceManager.js";
 import { BACKGROUND_CONFIG, STORAGE_CONFIG } from "../constants/swipeConfig.js";
 
-// gallery scene for hacked profiles. owns its own logic on purpose so the
-// "find why a portrait moves / clicks" answer is right here in the scene.
-//
-// data flow:
-//   PersistenceManager.getHackedCardIDs() -> ids hacked this session
-//   ProfileLoader.getValidProfiles()      -> full profile objects
-//   filtered hacked profiles              -> 3-column grid of portraits
-//
-// scrolling: simple manual y-shift on this.gridContainer; mouse wheel +
-// pointer drag both feed the same clamp.
+// Shows hacked profiles in a scrollable grid.
+// Clicking a profile now starts the bypass scene.
 export class StorageScene extends Phaser.Scene {
   constructor() {
     super({ key: "Storage" });
@@ -288,26 +280,13 @@ export class StorageScene extends Phaser.Scene {
     this.gridContainer.y = next;
   }
 
-  // ===== MINIGAME REDIRECT HOOK - EDIT THIS METHOD =====
-  // fires once when the player clicks a portrait in the storage grid.
-  // `profile` is the FULL profile object from profiles.json for the
-  // portrait that was clicked, shaped like:
-  //   { id, name, text, imagePath }
-  //
-  // current behavior: log a debug line so teammates can confirm the click
-  // wired through the right profile while the real minigame scenes are
-  // still being built.
-  //
-  // to redirect to a per-profile minigame later:
-  //   1. add the minigame scene class to the scene list in game.js
-  //   2. dispatch on profile.id (or add a `targetSceneKey` field to
-  //      profiles.json and use that directly).
-  //
-  // example:
-  //   this.scene.start("YourMinigameKey", { profile });
+  // Called when a profile tile is clicked.
+  // Starts the bypass flow from Storage.
   launchProfileMinigame(profile) {
     if (profile == null) return;
-    console.log(`[DEBUG] Starting minigame for: ${profile.name}`);
+    if (typeof profile !== "object") return;
+    if (profile.id == null) return;
+    this.scene.start("GearPuzzleScene", { profile });
   }
 
   // resize: rebuild header + grid x positions from new camera dimensions.

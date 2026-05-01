@@ -22,9 +22,9 @@ const gameConfig = {
     windowEvents: true,
     touch: { capture: true },
   },
-  // ProfileDetailScene: launched as overlay by SwipeDeckScene after a HACK commit.
-  // StorageScene: launched by SwipeDeckScene when the Collection button is pressed.
-  // GearPuzzleScene: launched when the deck is exhausted (all cards swiped).
+  // Storage opens from SwipeDeck's Collection button.
+  // ProfileDetail opens when a profile is clicked in Storage.
+  // GearPuzzle opens when dating succeeds (or when the deck is exhausted).
   scene: [TitleScreenScene, SwipeDeckScene, GearPuzzleScene, StorageScene, ProfileDetailScene],
 };
 
