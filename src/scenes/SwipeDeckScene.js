@@ -121,12 +121,31 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.resizeHandler = () => this.handleResize();
     this.scale.on("resize", this.resizeHandler);
     this.events.on("wake", () => this.handleResize());
-    this.profileDatingHandler = () => {
+    this.profileDatingHandler = (event) => {
       // Green "Start Dating" button in ProfileDetail sends this event.
       // We route that success path into the gear puzzle scene.
+      let profileId = null;
+      if (event && event.detail && event.detail.profileId != null) {
+        const numericId = Number(event.detail.profileId);
+        if (Number.isFinite(numericId)) {
+          profileId = numericId;
+        }
+      }
+      if (profileId == null) {
+        const fallbackProfile = GameState.getLastHackedProfile();
+        if (fallbackProfile && fallbackProfile.id != null) {
+          const numericFallback = Number(fallbackProfile.id);
+          if (Number.isFinite(numericFallback)) {
+            profileId = numericFallback;
+          }
+        }
+      }
       this.scene.stop("Storage");
       this.scene.stop("ProfileDetail");
-      this.scene.start("GearPuzzleScene");
+      this.scene.start("GearPuzzleScene", {
+        profileId,
+        bypassSource: "dating",
+      });
     };
     window.addEventListener("profile-dating", this.profileDatingHandler);
     this.events.once("shutdown", () => this.cleanup());

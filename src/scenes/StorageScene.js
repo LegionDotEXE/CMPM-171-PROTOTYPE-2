@@ -286,7 +286,12 @@ export class StorageScene extends Phaser.Scene {
     if (profile == null) return;
     if (typeof profile !== "object") return;
     if (profile.id == null) return;
-    this.scene.start("GearPuzzleScene", { profile });
+    const numericId = Number(profile.id);
+    this.scene.start("GearPuzzleScene", {
+      profile,
+      profileId: Number.isFinite(numericId) ? numericId : null,
+      bypassSource: "storage",
+    });
   }
 
   // resize: rebuild header + grid x positions from new camera dimensions.

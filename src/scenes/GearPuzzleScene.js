@@ -386,14 +386,37 @@ export class GearPuzzleScene extends Phaser.Scene {
 
     this.time.delayedCall(500, () => {
       let profile = null;
+      let profileId = null;
+      let bypassSource = null;
       if (this.flowData != null && typeof this.flowData === "object") {
         if (this.flowData.profile != null && typeof this.flowData.profile === "object") {
           profile = this.flowData.profile;
+        }
+        if (this.flowData.profileId != null) {
+          const numericId = Number(this.flowData.profileId);
+          if (Number.isFinite(numericId)) {
+            profileId = numericId;
+          }
+        }
+        if (typeof this.flowData.bypassSource === "string") {
+          bypassSource = this.flowData.bypassSource;
         }
       }
       if (profile == null) {
         profile = GameState.getLastHackedProfile();
       }
+      if (profileId == null && profile != null && profile.id != null) {
+        const numericProfileId = Number(profile.id);
+        if (Number.isFinite(numericProfileId)) {
+          profileId = numericProfileId;
+        }
+      }
+
+      if (bypassSource === "dating") {
+        this.scene.start("stalkingScene", { profileId });
+        return;
+      }
+
       this.scene.start("ProfileDetail", { profile });
     });
   }
