@@ -45,6 +45,8 @@ export const CARD_CONFIG = Object.freeze({
 
 // per-card visual styling. with text baked into the PNG, this is now just
 // the grab tween + fallback color used when a texture hasn't loaded yet.
+// per-card visual styling. with text baked into the PNG, this is now just
+// the grab tween + fallback color used when a texture hasn't loaded yet.
 export const CARD_STYLE = Object.freeze({
   grabTweenMs: 110, // grab/release scale tween duration
   grabEase: "Sine.easeOut", // easing for the grab puff
@@ -107,7 +109,15 @@ export const EFFECT_STYLE = Object.freeze({
 // card size is derived from the DISPLAYED phone background (after fit-scaling),
 // not the raw camera. percentages match BACKGROUND_CONFIG.innerScreen* so the
 // card fully fills the phone's inner screen rectangle.
+// card size is derived from the DISPLAYED phone background (after fit-scaling),
+// not the raw camera. percentages match BACKGROUND_CONFIG.innerScreen* so the
+// card fully fills the phone's inner screen rectangle.
 export const LAYOUT_CONFIG = Object.freeze({
+  cardWidthPct: 1.001, // card width as fraction of bg display width (matches inner screen)
+  cardHeightPct: 1.001, // card height as fraction of bg display height (matches inner screen)
+  cardAspectTall: 2.7, // loose enough that aspect never clamps fill height
+  cardMinWidth: 160, // never render cards narrower than this
+  cardMaxWidth: 700, // never render cards wider than this (clamps only on huge monitors)
   cardWidthPct: 1.001, // card width as fraction of bg display width (matches inner screen)
   cardHeightPct: 1.001, // card height as fraction of bg display height (matches inner screen)
   cardAspectTall: 2.7, // loose enough that aspect never clamps fill height

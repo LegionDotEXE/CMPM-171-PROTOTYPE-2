@@ -95,92 +95,106 @@ export class GearPuzzleScene extends Phaser.Scene {
     // Puzzle state
     this._puzzleIndex = 0;
     this._won = false;
+    this._winTimer = 0; // how long LOCK has been spinning (win after 0.8 s)
+    this._hovered = null; // gear id that mouse is hovering over
 
-    this._titleText = this.add.text(width / 2, 24, '', {
-      fontFamily: 'monospace', fontSize: '18px', color: '#c9d6e8',
-    }).setOrigin(0.5, 0).setDepth(10);
+    this._holdState = null; // hold to turn
+    // hint for user
+    this._holdLabel = this.add.text(0, 0, 'RELEASE IN ZONE', {
+      fontFamily: 'monospace',
+      fontSize: '10px',
+      color: '#FFFFFF', // The color is white
+    }).setOrigin(0.5, 1).setDepth(51).setVisible(false);
 
-    this._statusText = this.add.text(width / 2, height - 28, '', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#4a6a8a',
+    // puzzle name
+    this._titleText = this.add.text(16, 12, '', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#c9d6e8',
+    })
+
+    this._statusText = this.add.text(width / 2, height - 20, '', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#4a6a8a',
     }).setOrigin(0.5, 1).setDepth(10);
 
-    this._makeBtn(width / 2 - 90, height - 60, 'Prev', () => {
-      if(this._puzzleIndex > 0) this._load(this._puzzleIndex - 1);
-    });
-    this._makeBtn(width / 2 + 10, height - 60, 'Next', () => {
-      if(this._puzzleIndex < PUZZLES.length - 1) this._load(this._puzzleIndex + 1);
-    });
+    this._makeBtn(14, height - 44, 'RESET', () => this._load(this._puzzleIndex));
+    this._makeBtn(14 + 84 + 8, height - 44, 'NEXT >>', () => this._load((this._puzzleIndex + 1) % PUZZLES.length));
 
-    this._load(0);
+    this._load(0); // loads and displays first puzzle
   }
 
+  // hold bar filling, gear rotation propagation, gear angle advancement, drawing, win detection
   update(time, delta) {
-    const dt = delta / 1000;
+    if(!this.gears) return;
+    const dt = delta / 1000; // convert ms to s
+
+    // while player is holding, increase fill. if they hold too long past the green zone, auto-fail
+    if (this._holdState?.holding) {
+      const fillTime = BASE_FILL_TIME - this._puzzleIndex * 0.15;
+      this._holdState.fill = Math.min(1, this._holdState.fill + dt / fillTime);
+
+      if(this._holdState.fill > ZONE_HIGH + 0.12) { // held too long
+        this._failHold();
+      }
+    }
+
+    this._propagate();
+    this.gears.forEach(g=> {g.angle += g.rotSpeed * dt;}); // increase gears' visual rotation angles
+
     this.gfx.clear();
     this.gfxOverlay.clear();
 
-    this._propagate();
-
-    // draw edges
-    this.edges.forEach(([aId, bId]) => {
-      const a = this._getGear(aId), b = this._getGear(bId);
-      if(!a || !b) return;
-      this.gfx.lineStyle(1, 0x1a2e40, 1);
+    // draw connecting lines
+    this.gfx.lineStyle(0.5, 0x1a2e40, 0.6);
+    this.edges.forEach(([aIndex, bIndex]) => {
+      const a = this._getGear(aIndex);
+      const b = this._getGear(bIndex);
       this.gfx.strokeLineShape(new Phaser.Geom.Line(a.x, a.y, b.x, b.y));
     });
 
     this.gears.forEach(gear => {
-      gear.angle += gear.rotSpeed * dt;
+      const isLocked = gear.type === 'locked';
+      const isHovered = this._hovered === gear.id;
+      const isHeld = this._holdState?.gearId === gear.id;
 
-      let strokeColor = 0x2a4a6a;
-      let fillColor   = 0x0d1f30;
+      let stroke;
+      if (gear.type === 'driver') stroke = 0xb784d3;
+      else if (isLocked) stroke = 0xec87c0;
+      else if (gear.isAligned) stroke = 0xd8abf6;
+      else if (isHeld) stroke = 0xffcc00;
+      else if (isHovered) stroke = 0xff6644;
+      else stroke = 0x185fa5;
 
-      if(gear.type === 'driver') {
-        strokeColor = 0x1d6a9e;
-        fillColor   = 0x0a1828;
-      } else if(gear.type === 'lock') {
-        const allAligned = this.gears.filter(g => g.type === 'locked').every(g => g.isAligned);
-        strokeColor = allAligned ? 0x1d9e75 : 0x4a2a6a;
-        fillColor   = allAligned ? 0x0a2820 : 0x140a20;
-      } else if(gear.type === 'locked' && !gear.isAligned) {
-        strokeColor = gear._flashMiss > 0 ? 0xff2222 : 0x9e3a1d;
-        fillColor   = 0x200a0a;
-      } else if(gear.type === 'locked' && gear.isAligned) {
-        strokeColor = 0x1d9e4a;
-        fillColor   = 0x0a2010;
-      }
+      this._drawGear(this.gfx, gear, stroke, 0x0a1e3a);
 
-      if(this._hovered === gear.id && !gear.isAligned) {
-        strokeColor = 0xffcc00;
-      }
+      if(isLocked && !gear.isAligned) {
+        this.gfx.lineStyle(1, isHeld ? 0xffcc00 : (isHovered ? 0xff6644 : 0x185fa5), 0.4);
+        this.gfx.strokeCircle(gear.x, gear.y, gear.r + 10);
 
-      this._drawGear(this.gfx, gear, strokeColor, fillColor);
+        const gap = 12;
+        const startX = gear.x - ((gear.stepsLeft - 1) * gap) / 2;
+        for (let i = 0; i < gear.stepsLeft; ++i) {
+          this.gfx.fillStyle(0x185fa5, 1);
+          this.gfx.fillCircle(startX + i * gap, gear.y + gear.r + 18, 3.5);
+        }
 
-      if(gear.type === 'locked' && !gear.isAligned) {
-        this.gfx.fillStyle(0xffffff, 0.85);
-        this.gfx.fillCircle(gear.x, gear.y, 5);
-        const label = `${gear.stepsLeft}`;
-        // steps left displayed near gear
+        if(isHeld && this._holdState) {
+          this._drawHoldBar(gear, this._holdState.fill);
+          this._holdLabel.setPosition(gear.x, gear.y - gear.r - 34).setVisible(true);
+        } else {
+          this._holdLabel.setVisible(false);
+        }
       }
     });
 
-    // hold bar fill
-    if(this._holdState?.holding) {
-      const fillTime = BASE_FILL_TIME * Math.pow(0.85, this._puzzleIndex);
-      this._holdState.fill = Math.min(1, (this._holdState.fill ?? 0) + dt / fillTime);
-
-      const gear = this._getGear(this._holdState.gearId);
-      if(gear) this._drawHoldBar(gear, this._holdState.fill);
-
-      if(this._holdState.fill >= 1) this._failHold();
-    }
-
-    // win check
+    // LOCK gear must spin continuously for 0.8 ss to trigger win
     if(!this._won) {
-      const lockGear = this._getGear('LOCK');
-      if(lockGear && Math.abs(lockGear.rotSpeed) > 0.01) {
-        this._winTimer = (this._winTimer ?? 0) + dt;
-        if(this._winTimer > 1.2) this._win();
+      const lock = this._getGear('LOCK');
+      if(lock && Math.abs(lock.rotSpeed) > 0.01) {
+        this._winTimer += dt;
+        if(this._winTimer >= 0.8) this._win();
       } else {
         this._winTimer = 0;
       }

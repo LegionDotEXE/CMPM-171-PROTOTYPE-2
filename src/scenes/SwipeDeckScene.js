@@ -42,8 +42,13 @@ export class SwipeDeckScene extends Phaser.Scene {
 
   // preload: profiles json + the shared phone background. profile images are
   // queued later by ProfileLoader once we know which ones are valid.
+  // preload: profiles json + the shared phone background. profile images are
+  // queued later by ProfileLoader once we know which ones are valid.
   preload() {
     ProfileLoader.preloadJson(this);
+    if (!this.textures.exists(BACKGROUND_CONFIG.phoneTextureKey)) {
+      this.load.image(BACKGROUND_CONFIG.phoneTextureKey, BACKGROUND_CONFIG.phoneImagePath);
+    }
     if (!this.textures.exists(BACKGROUND_CONFIG.phoneTextureKey)) {
       this.load.image(BACKGROUND_CONFIG.phoneTextureKey, BACKGROUND_CONFIG.phoneImagePath);
     }
@@ -52,7 +57,13 @@ export class SwipeDeckScene extends Phaser.Scene {
   // create: paint background, read profiles, start progressive load, wire
   // resize/shutdown. when the initial batch finishes, startGameplay builds
   // the stack and the collection button is wired up.
+  // create: paint background, read profiles, start progressive load, wire
+  // resize/shutdown. when the initial batch finishes, startGameplay builds
+  // the stack and the collection button is wired up.
   create() {
+    this.setupBackground();
+    this.setupCollectionButton();
+
     this.setupBackground();
     this.setupCollectionButton();
 
@@ -118,9 +129,12 @@ export class SwipeDeckScene extends Phaser.Scene {
   // kept in one method so cleanup() can mirror every binding exactly.
   // wake refreshes layout in case the window was resized while we were
   // sleeping behind the storage scene.
+  // wake refreshes layout in case the window was resized while we were
+  // sleeping behind the storage scene.
   bindSceneLifecycle() {
     this.resizeHandler = () => this.handleResize();
     this.scale.on("resize", this.resizeHandler);
+    this.events.on("wake", () => this.handleResize());
     this.events.on("wake", () => this.handleResize());
     this.events.once("shutdown", () => this.cleanup());
     this.events.once("destroy", () => this.cleanup());
@@ -153,7 +167,15 @@ export class SwipeDeckScene extends Phaser.Scene {
   // when the bg has been fit-scaled we size the card off of THAT (not the
   // raw camera), so the card always lives inside the phone frame's screen
   // area regardless of window size. fallback to camera dims if no bg yet.
+  // compute card size relative to the displayed phone background.
+  // when the bg has been fit-scaled we size the card off of THAT (not the
+  // raw camera), so the card always lives inside the phone frame's screen
+  // area regardless of window size. fallback to camera dims if no bg yet.
   //
+  // width  = baseWidth  * cardWidthPct  (clamped by min/max)
+  // height = min(baseHeight * cardHeightPct, width * aspectTall)
+  // centerY is shifted so the card sits centered on the phone SCREEN, not
+  // the bg art's geometric center (the home button strip pulls it down).
   // width  = baseWidth  * cardWidthPct  (clamped by min/max)
   // height = min(baseHeight * cardHeightPct, width * aspectTall)
   // centerY is shifted so the card sits centered on the phone SCREEN, not
@@ -163,15 +185,21 @@ export class SwipeDeckScene extends Phaser.Scene {
     const baseWidth = this.backgroundDisplayWidth > 0 ? this.backgroundDisplayWidth : camera.width;
     const baseHeight = this.backgroundDisplayHeight > 0 ? this.backgroundDisplayHeight : camera.height;
     const uncappedWidth = baseWidth * LAYOUT_CONFIG.cardWidthPct;
+    const baseWidth = this.backgroundDisplayWidth > 0 ? this.backgroundDisplayWidth : camera.width;
+    const baseHeight = this.backgroundDisplayHeight > 0 ? this.backgroundDisplayHeight : camera.height;
+    const uncappedWidth = baseWidth * LAYOUT_CONFIG.cardWidthPct;
     const width = Phaser.Math.Clamp(uncappedWidth, LAYOUT_CONFIG.cardMinWidth, LAYOUT_CONFIG.cardMaxWidth);
+    const maxHeightByScreen = baseHeight * LAYOUT_CONFIG.cardHeightPct;
     const maxHeightByScreen = baseHeight * LAYOUT_CONFIG.cardHeightPct;
     const maxHeightByAspect = width * LAYOUT_CONFIG.cardAspectTall;
     const height = Math.min(maxHeightByScreen, maxHeightByAspect);
+    const centerYOffset = baseHeight * BACKGROUND_CONFIG.innerScreenCenterYOffsetPct;
     const centerYOffset = baseHeight * BACKGROUND_CONFIG.innerScreenCenterYOffsetPct;
     return {
       width,
       height,
       centerX: camera.width / 2,
+      centerY: camera.height / 2 + centerYOffset,
       centerY: camera.height / 2 + centerYOffset,
     };
   }
@@ -266,6 +294,7 @@ export class SwipeDeckScene extends Phaser.Scene {
   //   2. pending becomes active (already on screen + textured)
   //   3. create a fresh pending from the deck (if any remain)
   //   4. drop the new pending in from the top for visual continuity
+// in promote() — replace the existing method
   async promote() {
     if (this.activeCard) {
       this.activeCard.destroy();
@@ -277,7 +306,7 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.styleActive(this.activeCard);
 
     this.pendingCard = this.createCard(this.currentIndex + 1);
-    if (!this.pendingCard) return;
+    if (!this.pendingCard) return;  // onDeckExhausted fires from setupLogic adapter
     this.stylePending(this.pendingCard);
     await this.dropInPending(this.pendingCard);
   }
@@ -306,6 +335,7 @@ export class SwipeDeckScene extends Phaser.Scene {
     window.dispatchEvent(
       new CustomEvent("hack-commit", {
         detail: { profileId, hackedIds: PersistenceManager.getHackedCardIDs() },
+        detail: { profileId, hackedIds: PersistenceManager.getHackedCardIDs() },
       })
     );
   }
@@ -329,6 +359,7 @@ export class SwipeDeckScene extends Phaser.Scene {
   // fresh, then computeBounds reads them when sizing the card.
   handleResize() {
     this.fitBackground();
+    this.fitBackground();
     const next = this.computeBounds();
     if (next.width <= 0 || next.height <= 0) return;
     this.bounds = next;
@@ -340,6 +371,10 @@ export class SwipeDeckScene extends Phaser.Scene {
       this.pendingCard.applyLayout(this.bounds);
       this.stylePending(this.pendingCard);
     }
+  }
+
+  onDeckExhausted() {
+    this.scene.start('GearPuzzleScene');
   }
 
   // detach every listener we subscribed to and null-out refs.
@@ -360,6 +395,11 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.pointerMoveHandler = null;
     this.pointerUpHandler = null;
     this.keyDownHandler = null;
+    if (this.collectionBtn) {
+      this.collectionBtn.removeAllListeners();
+      this.collectionBtn = null;
+    }
+    this.backgroundImage = null;
     if (this.collectionBtn) {
       this.collectionBtn.removeAllListeners();
       this.collectionBtn = null;
