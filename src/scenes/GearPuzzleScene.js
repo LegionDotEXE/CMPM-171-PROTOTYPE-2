@@ -202,7 +202,8 @@ export class GearPuzzleScene extends Phaser.Scene {
     // LOCK gear must spin continuously for 0.8 ss to trigger win
     if(!this._won) {
       const lock = this._getGear('LOCK');
-      if(lock && Math.abs(lock.rotSpeed) > 0.01) {
+      const allAligned = this.gears.filter(g => g.type === 'locked').every(g => g.isAligned);
+      if(lock && allAligned && Math.abs(lock.rotSpeed) > 0.01) {
         this._winTimer += dt;
         if(this._winTimer >= 0.8) this._win();
       } else {
@@ -331,7 +332,7 @@ export class GearPuzzleScene extends Phaser.Scene {
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
     const shiftX = this._width / 2 - centerX;
-    const shiftY = this._height / 2 - centerX;
+    const shiftY = this._height / 2 - centerY;
 
     this.gears = puzzle.gears.map((g, i) => ({
       ...g,
@@ -439,7 +440,8 @@ export class GearPuzzleScene extends Phaser.Scene {
         const neighborGear = this._getGear(neighborId);
 
         // locked gear blocks the chain. don't propagate through it except for lock gear which always accepts spin
-        if(!currentGear.isAligned || (!neighborGear.isAligned && neighborGear.type !== 'lock')) return;
+        if(!currentGear.isAligned) return;
+        if(!neighborGear.isAligned && neighborGear.type !== 'lock') return;
         visited.add(neighborId);
         queue.push(neighborId);
         neighborGear.rotSpeed = -(currentGear.rotSpeed * currentGear.r / neighborGear.r);
