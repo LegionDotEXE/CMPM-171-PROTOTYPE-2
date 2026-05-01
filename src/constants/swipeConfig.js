@@ -140,7 +140,7 @@ export const LOADER_CONFIG = Object.freeze({
 // kept separate from BACKGROUND_CONFIG so TitleScreen never touches Phone-II.
 export const TITLE_BG_CONFIG = Object.freeze({
   textureKey: "phoneBg",
-  imagePath:  "assets/PhoneBackgroundBlurred.png",
+  imagePath:  "assets/HackNSlashTitle.png",
 });
 
 // shared phone-frame background asset (used by SwipeDeckScene + StorageScene only).
