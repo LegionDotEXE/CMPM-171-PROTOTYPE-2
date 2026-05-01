@@ -2,10 +2,11 @@ import { ProfileLoader } from "../systems/ProfileLoader.js";
 import { PersistenceManager } from "../systems/PersistenceManager.js";
 import { BACKGROUND_CONFIG, STORAGE_CONFIG } from "../constants/swipeConfig.js";
 
-// storage scene: a scrollable portrait grid of every profile the player has
-// hacked so far.
+// gallery scene for hacked profiles. owns its own logic on purpose so the
+// "find why a portrait moves / clicks" answer is right here in the scene.
 //
 // data flow:
+//   PersistenceManager.getHackedCardIDs() -> ids hacked this session
 //   ProfileLoader.getValidProfiles()      -> full profile objects
 //   filtered hacked profiles              -> 3-column grid of portraits
 //
@@ -116,6 +117,7 @@ export class StorageScene extends Phaser.Scene {
   }
 
   // top header: scene title + back button.
+  // back button mirrors the "Collection" button on SwipeDeckScene visually.
   setupHeader() {
     this.backBtn = this.add
       .text(20, 20, "< Back", {
@@ -146,7 +148,8 @@ export class StorageScene extends Phaser.Scene {
   }
 
   // intersect deck profiles with the hacked id set.
-  // returns profiles in their original deck order so the grid is stable.
+  // returns profiles in their original deck order so the grid is stable
+  // across visits (instead of "most recently hacked first" which would jitter).
   collectHackedProfiles() {
     const allProfiles = ProfileLoader.getValidProfiles(this);
     if (allProfiles.length === 0) return [];
@@ -157,7 +160,15 @@ export class StorageScene extends Phaser.Scene {
   }
 
   // 3-column grid built into a single container so we can move it with one
-  // y-shift when scrolling.
+  // y-shift when scrolling. the container is anchored to the top-left of
+  // the phone's INNER screen rect, so all per-cell math is local (no
+  // camera-relative offsets needed).
+  //
+  // grid math (the part future humans need to read):
+  //   column = index % columns        -> 0,1,2,0,1,2,...
+  //   row    = floor(index / columns) -> 0,0,0,1,1,1,...
+  //   x = (column + 0.5) * cellWidth   (centered in its cell)
+  //   y = (row    + 0.5) * cellHeight  (centered in its cell)
   buildGrid() {
     const screen = this.getInnerScreenRect();
     const cellWidth = screen.width / STORAGE_CONFIG.columns;
@@ -182,6 +193,8 @@ export class StorageScene extends Phaser.Scene {
   }
 
   // build one clickable portrait for the grid.
+  // texture key may not be loaded yet (loadBatch failed for that asset);
+  // fall back to a colored rectangle so the cell is never empty.
   createPortrait(profile, x, y) {
     const textureKey = ProfileLoader.textureKeyFor(profile);
     let portrait;
@@ -203,7 +216,8 @@ export class StorageScene extends Phaser.Scene {
     return portrait;
   }
 
-  // empty state: centered message inside the phone's inner screen.
+  // empty state: centered message inside the phone's inner screen so it
+  // sits where the grid would have been.
   showEmptyState() {
     const screen = this.getInnerScreenRect();
     this.emptyText = this.add
@@ -217,6 +231,9 @@ export class StorageScene extends Phaser.Scene {
   }
 
   // recompute scroll clamp bounds for current inner-screen viewport.
+  // scrollMaxY = grid resting position (top of inner screen + pad).
+  // scrollMinY = lowest the grid can scroll up to so the last row still
+  // sits inside the inner screen.
   recomputeScrollBounds() {
     const screen = this.getInnerScreenRect();
     const viewportHeight = screen.height - STORAGE_CONFIG.gridTopPad;
@@ -229,8 +246,12 @@ export class StorageScene extends Phaser.Scene {
     }
   }
 
-  // wire scroll handlers.
+  // wire scroll handlers. only meaningful when content overflows; otherwise
+  // the clamp keeps the grid pinned and the user can't scroll past nothing.
   bindScrollHandlers() {
+    // 6 profiles fill exactly 2 rows of a 3-column grid, which always fits
+    // within the viewport on any reasonable window. with 6 or fewer there
+    // is nothing to scroll, so we skip wiring the handlers entirely.
     if (this.hackedProfiles.length <= 6) return;
 
     this.wheelHandler = (pointer, gameObjects, deltaX, deltaY) => {
@@ -239,6 +260,9 @@ export class StorageScene extends Phaser.Scene {
     this.input.on("wheel", this.wheelHandler);
 
     this.pointerDownHandler = (pointer) => {
+      if (pointer.event && pointer.event.target && pointer.event.target.tagName === "CANVAS") {
+        // ignore drags that started on a portrait or button (they capture the event first).
+      }
       this.isDraggingBackground = true;
       this.dragLastY = pointer.y;
     };
@@ -265,11 +289,30 @@ export class StorageScene extends Phaser.Scene {
   }
 
   // ===== MINIGAME REDIRECT HOOK - EDIT THIS METHOD =====
+  // fires once when the player clicks a portrait in the storage grid.
+  // `profile` is the FULL profile object from profiles.json for the
+  // portrait that was clicked, shaped like:
+  //   { id, name, text, imagePath }
+  //
+  // current behavior: log a debug line so teammates can confirm the click
+  // wired through the right profile while the real minigame scenes are
+  // still being built.
+  //
+  // to redirect to a per-profile minigame later:
+  //   1. add the minigame scene class to the scene list in game.js
+  //   2. dispatch on profile.id (or add a `targetSceneKey` field to
+  //      profiles.json and use that directly).
+  //
+  // example:
+  //   this.scene.start("YourMinigameKey", { profile });
   launchProfileMinigame(profile) {
     if (profile == null) return;
     console.log(`[DEBUG] Starting minigame for: ${profile.name}`);
   }
 
+  // resize: rebuild header + grid x positions from new camera dimensions.
+  // we destroy the grid container and rebuild instead of mutating cells
+  // because the column width changes with camera width.
   bindSceneLifecycle() {
     this.resizeHandler = () => this.handleResize();
     this.scale.on("resize", this.resizeHandler);
