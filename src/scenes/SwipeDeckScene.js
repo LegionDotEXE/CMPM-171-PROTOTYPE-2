@@ -3,6 +3,7 @@ import { SwipeLogic } from "../systems/InputManager.js";
 import { SwipeEffects } from "../systems/SwipeEffects.js";
 import { ProfileLoader } from "../systems/ProfileLoader.js";
 import { PersistenceManager } from "../systems/PersistenceManager.js";
+import { GameState } from "../systems/GameState.js";
 import { BACKGROUND_CONFIG, CARD_CONFIG, LAYOUT_CONFIG, LOADER_CONFIG, SCENE_CONFIG } from "../constants/swipeConfig.js";
 
 // orchestrator scene. every piece of real gameplay logic lives in other
@@ -10,9 +11,11 @@ import { BACKGROUND_CONFIG, CARD_CONFIG, LAYOUT_CONFIG, LOADER_CONFIG, SCENE_CON
 //
 // flow:
 //   preload  -> ProfileLoader.preloadJson
-//   create   -> read profiles, compute bounds, kick off progressive load
+//   create   -> paint background, read profiles, compute bounds, kick off progressive load
 //   (ready)  -> build active+pending stack, create effects/logic, bind input
 //   commit   -> SwipeLogic.executeCommit -> scene.promote -> next card
+//   hack     -> onHackCommit stores id, onHackAnimationComplete pauses scene
+//               and launches ProfileDetailScene; SwipeDeckScene resumes on exit.
 //   resize   -> ProfileCard.applyLayout on every live card
 //   shutdown -> cleanup() detaches every listener we created
 export class SwipeDeckScene extends Phaser.Scene {
@@ -31,7 +34,7 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.pointerMoveHandler = null;
     this.pointerUpHandler = null;
     this.keyDownHandler = null;
-    this.backgroundImage = null; // blurred phone bg behind cards (fit, never stretched)
+    this.backgroundImage = null; // phone bg behind cards (fit, never stretched)
     this.backgroundDisplayWidth = 0; // displayed bg width after fit-scaling
     this.backgroundDisplayHeight = 0; // displayed bg height after fit-scaling
     this.collectionBtn = null; // top-left button that opens the StorageScene
@@ -61,7 +64,7 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.beginProgressiveLoad();
   }
 
-  // blurred phone background, sits behind every gameplay element.
+  // phone background, sits behind every gameplay element.
   // never stretched - we fit-scale it (Math.min) so the phone frame keeps
   // its native aspect ratio and we letterbox any extra camera space.
   setupBackground() {
@@ -185,10 +188,6 @@ export class SwipeDeckScene extends Phaser.Scene {
   }
 
   // create one ProfileCard, or null only if the index is past the end of the deck.
-  // we intentionally do NOT gate on texture readiness here: ProfileCard.buildImage
-  // already falls back to a colored rectangle when the texture is missing, so
-  // creating the card anyway keeps deck length stable and lets the background
-  // loader swap the real texture in on its own later.
   createCard(profileIndex) {
     if (profileIndex >= this.profiles.length) return null;
     const profile = this.profiles[profileIndex];
@@ -233,8 +232,12 @@ export class SwipeDeckScene extends Phaser.Scene {
             this.onDeckExhausted();
           }
         },
-        onHackCommit: (profileId) => this.onHackCommit(profileId),
-        onHackComplete: (profile) => this.launchHackMinigame(profile),
+        // onHackCommit: store id in both PersistenceManager (for StorageScene)
+        // and GameState (for ProfileDetailScene fallback).
+        onHackCommit: (profileId, profile) => this.onHackCommit(profileId, profile),
+        // onHackAnimationComplete: fires after binary rain, before promote().
+        // pauses SwipeDeck and launches ProfileDetailScene as an overlay.
+        onHackAnimationComplete: (profile) => this.onHackAnimationComplete(profile),
       },
       {
         threshold: SCENE_CONFIG.swipeThreshold,
@@ -263,11 +266,10 @@ export class SwipeDeckScene extends Phaser.Scene {
   //   2. pending becomes active (already on screen + textured)
   //   3. create a fresh pending from the deck (if any remain)
   //   4. drop the new pending in from the top for visual continuity
-// in promote() — replace the existing method
   async promote() {
     if (this.activeCard) {
       this.activeCard.destroy();
-      this.activeCard = null;       // ← explicit null so the check is reliable
+      this.activeCard = null;
     }
 
     this.activeCard = this.pendingCard;
@@ -275,7 +277,7 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.styleActive(this.activeCard);
 
     this.pendingCard = this.createCard(this.currentIndex + 1);
-    if (!this.pendingCard) return;  // onDeckExhausted fires from setupLogic adapter
+    if (!this.pendingCard) return;
     this.stylePending(this.pendingCard);
     await this.dropInPending(this.pendingCard);
   }
@@ -294,10 +296,13 @@ export class SwipeDeckScene extends Phaser.Scene {
     });
   }
 
-  // hack-commit hook. writes id into PersistenceManager and fires a
-  // window CustomEvent so other scenes/UI can subscribe without importing.
-  onHackCommit(profileId) {
+  // hack-commit hook. writes id into PersistenceManager (for StorageScene)
+  // and full profile into GameState (for ProfileDetailScene fallback).
+  // fires a window CustomEvent for any external subscribers.
+  onHackCommit(profileId, profile) {
     PersistenceManager.recordHack(profileId);
+    GameState.recordHack(profileId);
+    GameState.setLastHackedProfile(profile);
     window.dispatchEvent(
       new CustomEvent("hack-commit", {
         detail: { profileId, hackedIds: PersistenceManager.getHackedCardIDs() },
@@ -305,37 +310,25 @@ export class SwipeDeckScene extends Phaser.Scene {
     );
   }
 
-  // =====================================================================
-  // MINIGAME REDIRECT HOOK - EDIT THIS METHOD
-  // =====================================================================
-  // fires once after a successful hack swipe. by the time we get here:
-  //   - the hack tween (card thrown off-screen) has finished
-  //   - the binary-rain overlay has finished
-  //   - the next card has already dropped into place
-  //   - input is unlocked again (SwipeLogic state is back to IDLE)
-  //
-  // `profile` is the FULL profile object from profiles.json for the card
-  // that was just hacked, shaped like:
-  //   { id, name, text, imagePath }
-  //
-  // to redirect the player to your minigame scene:
-  //   1. add your scene class to the scene list in game.js
-  //   2. uncomment / write the scene.start call below
-  //
-  // example:
-  //   this.scene.start("YourMinigameKey", { profile });
-  //
-  // leave this method empty to stay on the swipe deck (default behavior).
-  // =====================================================================
-  launchHackMinigame(profile) {
-    // intentionally empty - fill in with your redirect / minigame launch.
+  // called by SwipeLogic after both the throw animation AND the binary rain
+  // have finished resolving. pauses SwipeDeck and launches ProfileDetailScene
+  // on top as an overlay. resolve immediately so promote() runs while paused
+  // (stack resets invisibly; user only sees SwipeDeck again after resuming).
+  onHackAnimationComplete(profile) {
+    this.scene.pause("SwipeDeck");
+    this.scene.launch("ProfileDetail", { profile });
+    return Promise.resolve();
+  }
+
+  // called when both activeCard and pendingCard are null after promotion.
+  // the entire deck has been swiped — hand off to the gear puzzle minigame.
+  onDeckExhausted() {
+    this.scene.start("GearPuzzleScene");
   }
 
   // reflow every live card + background for a new viewport.
   // order matters: fit the bg FIRST so backgroundDisplayWidth/Height are
   // fresh, then computeBounds reads them when sizing the card.
-  // skips if computed bounds are degenerate (eg. zero-size window during
-  // transition) so applyLayout never receives nonsense numbers.
   handleResize() {
     this.fitBackground();
     const next = this.computeBounds();
@@ -349,10 +342,6 @@ export class SwipeDeckScene extends Phaser.Scene {
       this.pendingCard.applyLayout(this.bounds);
       this.stylePending(this.pendingCard);
     }
-  }
-
-  onDeckExhausted() {
-    this.scene.start('GearPuzzleScene');
   }
 
   // detach every listener we subscribed to and null-out refs.
