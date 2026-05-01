@@ -14,8 +14,6 @@ function nextFallbackId() {
 // one profile card in the swiper deck.
 // the card is just the profile PNG (name + description are baked into the
 // art now), so this container only holds a single image child.
-// the card is just the profile PNG (name + description are baked into the
-// art now), so this container only holds a single image child.
 //
 // defensive: the constructor validates profile + bounds shape. bad data
 // produces a warning and a safe-default card (never throws, never crashes
@@ -82,13 +80,9 @@ export class ProfileCard extends Phaser.GameObjects.Container {
   // build the single image visual sized to the full bounds.
   // image fills width/height; if the texture is missing we drop in a colored
   // rectangle so the card is never invisible.
-  // build the single image visual sized to the full bounds.
-  // image fills width/height; if the texture is missing we drop in a colored
-  // rectangle so the card is never invisible.
   initLayout() {
     const { width, height } = this.bounds;
     this.image = this.buildImage(width, height);
-    this.add([this.image]);
     this.add([this.image]);
   }
 
@@ -101,16 +95,12 @@ export class ProfileCard extends Phaser.GameObjects.Container {
     const textureKey = this.textureKey();
     if (this.scene.textures.exists(textureKey)) {
       const image = this.scene.add.image(0, 0, textureKey);
-      image.setDisplaySize(width * 1.05, height * 1.001); 
-      const image = this.scene.add.image(0, 0, textureKey);
-      image.setDisplaySize(width * 1.05, height * 1.001); 
+      image.setDisplaySize(width * 1.08, height * 1.08); // bleeds border off edges
       return image;
     }
     return this.scene.add.rectangle(0, 0, width, height, CARD_STYLE.fallbackPanelColor, 1);
-    return this.scene.add.rectangle(0, 0, width, height, CARD_STYLE.fallbackPanelColor, 1);
   }
 
-  // reflow the image for a new bounds box.
   // reflow the image for a new bounds box.
   // called on window resize so the same card instance re-paints itself
   // without being destroyed.
@@ -123,8 +113,6 @@ export class ProfileCard extends Phaser.GameObjects.Container {
       this.image.setPosition(0, 0);
       this.image.setDisplaySize(width * 1.08, height * 1.08); // bleeds border off edges
     } else {
-      this.image.setPosition(0, 0);
-      this.image.setSize(width, height);
       this.image.setPosition(0, 0);
       this.image.setSize(width, height);
     }
@@ -149,7 +137,6 @@ export class ProfileCard extends Phaser.GameObjects.Container {
   // kills any existing scale tween so repeated grabs don't pile up.
   setGrabState(isGrabbed) {
     this.scene.tweens.killTweensOf(this);
-    // pick scale based on grab state: puff up on grab, return to rest on release
     let targetScale;
     if (isGrabbed) {
       targetScale = CARD_CONFIG.grabScale;
