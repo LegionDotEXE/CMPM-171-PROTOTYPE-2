@@ -100,6 +100,12 @@ export class ProfileDetailScene extends Phaser.Scene {
     if (!this.textures.exists("ssnAsset")) {
       this.load.image("ssnAsset", "assets/ssn_card.png");
     }
+    if (this.currentProfile && this.currentProfile.photoPath) {
+      const detailTextureKey = `profile_photo_${this.currentProfile.id}`;
+      if (!this.textures.exists(detailTextureKey)) {
+        this.load.image(detailTextureKey, this.currentProfile.photoPath);
+      }
+    }
     // kenny particle spritesheet: 2048x2048, 4x4 grid, 512x512 per frame.
     // row 1 (frames 4-7) = debris/splatter clouds used for the blood burst.
     if (!this.textures.exists("kennyParticles")) {
@@ -308,7 +314,10 @@ export class ProfileDetailScene extends Phaser.Scene {
   // profile image with green accent border
   addProfileImage(cx, y, contentWidth) {
     const profile = this.currentProfile;
-    const textureKey = `profile_${profile.id}`;
+    const detailTextureKey = `profile_photo_${profile.id}`;
+    const textureKey = this.textures.exists(detailTextureKey)
+      ? detailTextureKey
+      : `profile_${profile.id}`;
     const imgW = contentWidth * 0.85;
     const imgH = DETAIL_LAYOUT.profileImageHeight;
     const imgCY = y + imgH / 2;

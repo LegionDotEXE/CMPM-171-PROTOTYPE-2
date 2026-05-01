@@ -7,6 +7,7 @@
       "name": "Soldier",
       "text": "I've seen some things... Looking for some fun after the war :0",
       "imagePath": "assets/profiles/Soilder Tinder.png",
+      "photoPath": "assets/profiles/Photos/Soilder.png",
       "info": {
         "age": "41",
         "occupation": "Fighting in da war",
@@ -33,6 +34,7 @@
       "name": "Nayanika",
       "text": "Life is a gamble. Send me money!!",
       "imagePath": "assets/profiles/Nayanika Tinder.png",
+      "photoPath": "assets/profiles/Photos/Nayanika.png",
       "info": {
         "age": "20",
         "occupation": "Lip Gloss Tester",
@@ -59,6 +61,7 @@
       "name": "Efe",
       "text": "Cat dad, S.T.A.L.K.E.R enthusiast, game design nerd!",
       "imagePath": "assets/profiles/Efe Tinder.png",
+      "photoPath": "assets/profiles/Photos/Efe.jpg",
       "info": {
         "age": "21",
         "occupation": "Full-Time Cat Dad",
@@ -85,6 +88,7 @@
       "name": "Altice",
       "text": "Teaching Professor, Computational Media, I loveeeee Marvel Snap",
       "imagePath": "assets/profiles/Altice Tinder.png",
+      "photoPath": "assets/profiles/Photos/Altice.png",
       "info": {
         "age": "25",
         "occupation": "Professional Marvel Snap Player",
@@ -111,6 +115,7 @@
       "name": "Melissa",
       "text": "Horse enthusiast, gatcha enjoyer, I play too much league -_-",
       "imagePath": "assets/profiles/Melissa Tinder.png",
+      "photoPath": "assets/profiles/Photos/Melissa.png",
       "info": {
         "age": "21",
         "occupation": "Gambler",
@@ -137,6 +142,7 @@
       "name": "Charles",
       "text": "Clash of Clans, Clash of Clans, Clash of Clans, ROYALLLLLLLLLLLEEEE",
       "imagePath": "assets/profiles/Charles Tinder.png",
+      "photoPath": "assets/profiles/Photos/Charles.jpg",
       "info": {
         "age": "21",
         "occupation": "The King Obviously",
@@ -163,6 +169,7 @@
       "name": "Biker",
       "text": "I like to ride, bike enthusiast, likes to see the sights",
       "imagePath": "assets/profiles/Motercycle Tinder.png",
+      "photoPath": "assets/profiles/Photos/Biker.jpg",
       "info": {
         "age": "21",
         "occupation": "Biker",
@@ -189,6 +196,7 @@
       "name": "Jared",
       "text": "I can pose just like a mannequin. See, we look the same!!",
       "imagePath": "assets/profiles/TA Tinder.png",
+      "photoPath": "assets/profiles/Photos/TA.jpg",
       "info": {
         "age": "25",
         "occupation": "Standing Still",
@@ -215,6 +223,7 @@
       "name": "Hike",
       "text": "D1 Hiker, no one loves trees more than me!!!!",
       "imagePath": "assets/profiles/D1 Hiker Tinder.png",
+      "photoPath": "assets/profiles/Photos/Hiker.jpg",
       "info": {
         "age": "26",
         "occupation": "Hiking Duh",
@@ -241,6 +250,7 @@
       "name": "Annette",
       "text": "“tall glass of water.” I enjoy long walks on the beach ",
       "imagePath": "assets/profiles/Annette Tinder.png",
+      "photoPath": "assets/profiles/Photos/Annette.jpg",
       "info": {
         "age": "22",
         "occupation": "Beach Walker",
