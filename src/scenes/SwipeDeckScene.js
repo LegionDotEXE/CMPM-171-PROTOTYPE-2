@@ -226,7 +226,13 @@ export class SwipeDeckScene extends Phaser.Scene {
       this,
       {
         getActive: () => this.activeCard,
-        promote: () => this.promote(),
+        promote: async () => {
+          await this.promote();
+          // after promotion, if both slots are now empty the deck is done
+          if (!this.activeCard && !this.pendingCard) {
+            this.onDeckExhausted();
+          }
+        },
         onHackCommit: (profileId) => this.onHackCommit(profileId),
         onHackComplete: (profile) => this.launchHackMinigame(profile),
       },
@@ -257,14 +263,19 @@ export class SwipeDeckScene extends Phaser.Scene {
   //   2. pending becomes active (already on screen + textured)
   //   3. create a fresh pending from the deck (if any remain)
   //   4. drop the new pending in from the top for visual continuity
+// in promote() — replace the existing method
   async promote() {
-    if (this.activeCard) this.activeCard.destroy();
+    if (this.activeCard) {
+      this.activeCard.destroy();
+      this.activeCard = null;       // ← explicit null so the check is reliable
+    }
+
     this.activeCard = this.pendingCard;
     this.currentIndex += 1;
     this.styleActive(this.activeCard);
 
     this.pendingCard = this.createCard(this.currentIndex + 1);
-    if (!this.pendingCard) return;
+    if (!this.pendingCard) return;  // onDeckExhausted fires from setupLogic adapter
     this.stylePending(this.pendingCard);
     await this.dropInPending(this.pendingCard);
   }
@@ -338,6 +349,10 @@ export class SwipeDeckScene extends Phaser.Scene {
       this.pendingCard.applyLayout(this.bounds);
       this.stylePending(this.pendingCard);
     }
+  }
+
+  onDeckExhausted() {
+    this.scene.start('GearPuzzleScene');
   }
 
   // detach every listener we subscribed to and null-out refs.
