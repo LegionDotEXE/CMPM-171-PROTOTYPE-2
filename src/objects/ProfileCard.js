@@ -95,7 +95,7 @@ export class ProfileCard extends Phaser.GameObjects.Container {
     const textureKey = this.textureKey();
     if (this.scene.textures.exists(textureKey)) {
       const image = this.scene.add.image(0, 0, textureKey);
-      image.setDisplaySize(width * 1.08, height * 1.08); // bleeds border off edges
+      image.setDisplaySize(width * 1.08, height * 1.001);
       return image;
     }
     return this.scene.add.rectangle(0, 0, width, height, CARD_STYLE.fallbackPanelColor, 1);
