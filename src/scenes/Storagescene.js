@@ -1,5 +1,6 @@
 import { ProfileLoader } from "../systems/ProfileLoader.js";
 import { PersistenceManager } from "../systems/PersistenceManager.js";
+import { GameState } from "../systems/GameState.js";
 import { BACKGROUND_CONFIG, STORAGE_CONFIG } from "../constants/swipeConfig.js";
 
 // Shows hacked profiles in a scrollable grid.
@@ -139,7 +140,7 @@ export class StorageScene extends Phaser.Scene {
       .setDepth(100);
   }
 
-  // intersect deck profiles with the hacked id set.
+  // Build the storage list from hacked ids and remove terminated profiles.
   // returns profiles in their original deck order so the grid is stable
   // across visits (instead of "most recently hacked first" which would jitter).
   collectHackedProfiles() {
@@ -148,7 +149,19 @@ export class StorageScene extends Phaser.Scene {
     const hackedIds = PersistenceManager.getHackedCardIDs();
     if (hackedIds.length === 0) return [];
     const idLookup = new Set(hackedIds);
-    return allProfiles.filter((profile) => idLookup.has(Number(profile.id)));
+    const killedLookup = new Set();
+    if (GameState.killedIds != null && typeof GameState.killedIds.forEach === "function") {
+      GameState.killedIds.forEach((id) => {
+        const numericId = Number(id);
+        if (Number.isFinite(numericId)) killedLookup.add(numericId);
+      });
+    }
+    return allProfiles.filter((profile) => {
+      const numericId = Number(profile.id);
+      if (!idLookup.has(numericId)) return false;
+      if (killedLookup.has(numericId)) return false;
+      return true;
+    });
   }
 
   // 3-column grid built into a single container so we can move it with one
