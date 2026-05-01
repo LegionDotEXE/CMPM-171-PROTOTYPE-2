@@ -225,7 +225,13 @@ export class SwipeDeckScene extends Phaser.Scene {
       this,
       {
         getActive: () => this.activeCard,
-        promote: () => this.promote(),
+        promote: async () => {
+          await this.promote();
+          // after promotion, if both slots are now empty the deck is done
+          if (!this.activeCard && !this.pendingCard) {
+            this.onDeckExhausted();
+          }
+        },
         // onHackCommit: store id in both PersistenceManager (for StorageScene)
         // and GameState (for ProfileDetailScene fallback).
         onHackCommit: (profileId, profile) => this.onHackCommit(profileId, profile),
@@ -261,7 +267,11 @@ export class SwipeDeckScene extends Phaser.Scene {
   //   3. create a fresh pending from the deck (if any remain)
   //   4. drop the new pending in from the top for visual continuity
   async promote() {
-    if (this.activeCard) this.activeCard.destroy();
+    if (this.activeCard) {
+      this.activeCard.destroy();
+      this.activeCard = null;
+    }
+
     this.activeCard = this.pendingCard;
     this.currentIndex += 1;
     this.styleActive(this.activeCard);
@@ -308,6 +318,10 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.scene.pause("SwipeDeck");
     this.scene.launch("ProfileDetail", { profile });
     return Promise.resolve();
+  }
+
+  onDeckExhausted() {
+    this.scene.start('GearPuzzleScene');
   }
 
   // reflow every live card + background for a new viewport.
