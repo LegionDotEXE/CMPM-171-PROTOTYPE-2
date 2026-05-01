@@ -5,9 +5,19 @@ import { ProfileLoader } from "../systems/ProfileLoader.js";
 import { PersistenceManager } from "../systems/PersistenceManager.js";
 import { GameState } from "../systems/GameState.js";
 import { BACKGROUND_CONFIG, CARD_CONFIG, LAYOUT_CONFIG, LOADER_CONFIG, SCENE_CONFIG } from "../constants/swipeConfig.js";
-
-// Main swipe scene.
-// It keeps deck state and wires together input, effects, and scene transitions.
+import { StalkingScene } from "./StalkingScene.js";
+// orchestrator scene. every piece of real gameplay logic lives in other
+// modules - this scene just wires them together and owns deck pointers.
+//
+// flow:
+//   preload  -> ProfileLoader.preloadJson
+//   create   -> paint background, read profiles, compute bounds, kick off progressive load
+//   (ready)  -> build active+pending stack, create effects/logic, bind input
+//   commit   -> SwipeLogic.executeCommit -> scene.promote -> next card
+//   hack     -> onHackCommit stores id, onHackAnimationComplete pauses scene
+//               and launches ProfileDetailScene; SwipeDeckScene resumes on exit.
+//   resize   -> ProfileCard.applyLayout on every live card
+//   shutdown -> cleanup() detaches every listener we created
 export class SwipeDeckScene extends Phaser.Scene {
   constructor() {
     super({ key: "SwipeDeck" });
@@ -53,6 +63,10 @@ export class SwipeDeckScene extends Phaser.Scene {
     this.bounds = this.computeBounds();
     this.bindSceneLifecycle();
     this.beginProgressiveLoad();
+    this.stalkKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.input.keyboard.on("keydown-E", () => {
+      this.scene.start("stalkingScene");
+    });
   }
 
   // phone background, sits behind every gameplay element.

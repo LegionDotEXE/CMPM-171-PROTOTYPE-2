@@ -1,5 +1,6 @@
 import { TitleScreenScene } from "./src/scenes/TitleScreen.js";
 import { SwipeDeckScene } from "./src/scenes/SwipeDeckScene.js";
+import { StalkingScene } from "./src/scenes/StalkingScene.js";
 import { StorageScene } from "./src/scenes/StorageScene.js";
 import { GearPuzzleScene } from "./src/scenes/GearPuzzleScene.js";
 import { ProfileDetailScene } from "./src/scenes/ProfileDetailScene.js";
@@ -22,10 +23,10 @@ const gameConfig = {
     windowEvents: true,
     touch: { capture: true },
   },
-  // Storage opens from SwipeDeck's Collection button.
-  // ProfileDetail opens when a profile is clicked in Storage.
-  // GearPuzzle opens when dating succeeds (or when the deck is exhausted).
-  scene: [TitleScreenScene, SwipeDeckScene, GearPuzzleScene, StorageScene, ProfileDetailScene],
+  // ProfileDetailScene: launched as overlay by SwipeDeckScene after a HACK commit.
+  // StorageScene: launched by SwipeDeckScene when the Collection button is pressed.
+  // GearPuzzleScene: launched when the deck is exhausted (all cards swiped).
+  scene: [TitleScreenScene, SwipeDeckScene, GearPuzzleScene, StorageScene, ProfileDetailScene, StalkingScene],
 };
 
 if (!Phaser) {
