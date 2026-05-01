@@ -18,7 +18,7 @@ export const States = Object.freeze({
 //     once the hack tween finished AND the next card has dropped in.
 //     this is where teammates plug in minigame scene transitions.
 
-// Also onHackCommit -> PRofileDetailScene in SwipeDeckScene
+// Also onHackCommit -> ProfileDetailScene in SwipeDeckScene
 export class SwipeLogic {
   // construct the swipe logic around a scene + stack adapter.
   // input: scene (for tweens/camera), stack adapter, optional overrides.
