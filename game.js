@@ -1,6 +1,7 @@
 import { TitleScreenScene } from "./src/scenes/TitleScreen.js";
 import { SwipeDeckScene } from "./src/scenes/SwipeDeckScene.js";
-import {ProfileDetailScene} from "./src/scenes/ProfileDetailScene.js";
+import { StorageScene } from "./src/scenes/StorageScene.js";
+import { ProfileDetailScene } from "./src/scenes/ProfileDetailScene.js";
 
 const { Phaser } = window;
 
@@ -20,7 +21,9 @@ const gameConfig = {
     windowEvents: true,
     touch: { capture: true },
   },
-  scene: [TitleScreenScene, SwipeDeckScene, ProfileDetailScene],
+  // ProfileDetailScene: launched as overlay by SwipeDeckScene after a HACK commit.
+  // StorageScene: launched by SwipeDeckScene when the Collection button is pressed.
+  scene: [TitleScreenScene, SwipeDeckScene, StorageScene, ProfileDetailScene],
 };
 
 if (!Phaser) {
